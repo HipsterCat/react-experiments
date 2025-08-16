@@ -75,7 +75,9 @@ const BalanceCounter = () => {
     const buttonEl = buttonRefs[buttonIndex]?.current as HTMLElement | null;
     const iconEl = balanceIconRef.current as HTMLElement | null;
     const from = amount > 0 ? getElementCenter(buttonEl) : getElementCenter(iconEl);
-    const to = amount > 0 ? getElementCenter(iconEl) : getElementCenter(buttonEl);
+    const toCenter = amount > 0 ? getElementCenter(iconEl) : getElementCenter(buttonEl);
+    // Adjust final position to account for coin positioning
+    const to = { x: toCenter.x - 8, y: toCenter.y - 7 };
 
     // Create coins along an arc
     const coinCount = Math.min(Math.max(Math.floor(Math.abs(amount) / 1000), 4), 12);
@@ -158,13 +160,13 @@ const BalanceCounter = () => {
             initial={{
               x: coin.keyframesX[0],
               y: coin.keyframesY[0],
-              scale: 0.6,
+              scale: 0.5,
               opacity: 0
             }}
             animate={{
               x: coin.keyframesX,
               y: coin.keyframesY,
-              scale: [0.6, 1.1, 0.8],
+              scale: [0.5, 1.1, 0.8],
               opacity: [0, 1, 0.2]
             }}
             transition={{
@@ -178,28 +180,22 @@ const BalanceCounter = () => {
         ))}
       </AnimatePresence>
 
-      {/* Balance Display */}
-      <motion.div 
-        className="bg-white/95 backdrop-blur-sm rounded-2xl pl-1.5 pr-2 mb-8 relative z-10 flex items-center"
-        style={{ 
-          height: '30px',
-          outline: '1px solid rgba(0, 0, 0, 0.15)',
-          boxShadow: '0 0 20px 0 rgba(0, 0, 0, 0.20)'
-        }}
-        transition={{ duration: 0.3 * animationSpeed }}
-      >
-                 <div className="flex items-center" style={{ gap: '2px' }}>
-          <motion.div 
-            ref={balanceIconRef}
-            className="w-4 h-4 flex items-center justify-center"
-            animate={isAnimating ? { 
-              scale: [1, 1.3, 1.3, 1],
-              rotate: isCredit ? [0, 5, 0] : [0, -5, 0]
-            } : {}}
-            transition={{ duration: animDuration, times: [0, 0.15, 0.85, 1], ease: "easeInOut" }}
-          >
-            <img src="/src/assets/icon_coin.webp" alt="Coin" className="w-full h-full object-contain" />
-          </motion.div>
+      {/* Balance Display with Icon Overlay */}
+      <div className="relative mb-8">
+        {/* Balance Container */}
+        <motion.div 
+          className="bg-white/95 backdrop-blur-sm rounded-2xl pl-1.5 pr-2 relative z-10 flex items-center"
+          style={{ 
+            height: '30px',
+            outline: '1px solid rgba(0, 0, 0, 0.15)',
+            boxShadow: '0 0 20px 0 rgba(0, 0, 0, 0.20)',
+          }}
+          transition={{ duration: 0.3 * animationSpeed }}
+        >
+          <div className="flex items-center" style={{ gap: '2px' }}>
+            {/* Invisible placeholder to maintain spacing */}
+            <div className="w-4 h-4 flex items-center justify-center">
+            </div>
           
           <div className="flex items-center">
             <div className="flex items-center text-base font-bold leading-5 whitespace-nowrap">
@@ -222,7 +218,7 @@ const BalanceCounter = () => {
                   result.push(
                     <motion.span
                       key={`highlighted-group-${animId}-${i}`}
-                      className="inline-flex origin-left"
+                      className="inline-flex origin-left tabular-nums"
                       style={{ color: '#1f2937', fontSize: '1rem' }}
                       animate={isAnimating ? {
                         fontSize: ['1rem', '1.4rem', '1.4rem', '1rem'],
@@ -231,7 +227,8 @@ const BalanceCounter = () => {
                           isCredit ? '#22c55e' : '#f97316',
                           isCredit ? '#22c55e' : '#f97316',
                           '#1f2937'
-                        ]
+                        ],
+                        marginBottom: ['0px', '1px', '1px', '0px']
                       } : { fontSize: '1rem' }}
                       transition={{
                         duration: animDuration,
@@ -269,9 +266,27 @@ const BalanceCounter = () => {
                   return result;
                 })()}
             </div>
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+        
+        {/* Blue Dollar Icon - Positioned absolutely on top */}
+        <motion.div 
+          ref={balanceIconRef}
+          className="absolute w-4 h-4 flex items-center justify-center z-30 pointer-events-none"
+          style={{
+            left: '6px',
+            top: '7px'
+          }}
+          animate={isAnimating ? { 
+            scale: [1, 1.5, 1.5, 1],
+            x: [0, -4, -4, 0]
+                    } : {}}
+          transition={{ duration: animDuration, times: [0, 0.15, 0.85, 1], ease: "easeInOut" }}
+        >
+          <img src="/src/assets/icon_coin.webp" alt="Coin" className="w-full h-full object-contain" />
+        </motion.div>
+      </div>
 
 
       {/* Control Buttons */}
