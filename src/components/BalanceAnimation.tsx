@@ -7,12 +7,15 @@ const BalanceCounter = () => {
   const [animatingCoins, setAnimatingCoins] = useState([]);
   const [changeAmount, setChangeAmount] = useState(0);
   const animationSpeed = 1;
+  const HOLD_AFTER_MS = 10450; // pause on finished number
   const motionValue = useMotionValue(balance);
   const [displayBalance, setDisplayBalance] = useState(balance);
   const [diffStartIndex, setDiffStartIndex] = useState(-1);
   const [targetBalance, setTargetBalance] = useState(balance);
   const balanceIconRef = useRef(null);
   const buttonRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
+  const [animDuration, setAnimDuration] = useState(1);
+  const [animId, setAnimId] = useState(0);
 
   // Format number with comma separators
   const formatNumber = (num) => {
@@ -47,6 +50,7 @@ const BalanceCounter = () => {
     if (isAnimating) return;
     const newBalance = balance + amount;
     const oldBalance = balance;
+    setAnimId((id) => id + 1);
     setTargetBalance(newBalance);
     setChangeAmount(amount);
     setIsAnimating(true);
@@ -75,19 +79,27 @@ const BalanceCounter = () => {
     setAnimatingCoins(coins);
 
     // Animate the counter value
+    const duration = Math.min(Math.abs(amount) / 8000 + 1.2, 3) * animationSpeed;
+    setAnimDuration(duration);
     animate(motionValue, newBalance, {
-      duration: Math.min(Math.abs(amount) / 8000 + 1.2, 3) * animationSpeed,
+      duration,
       ease: "easeOut",
       onUpdate: (value) => {
+        console.log('onUpdate setDisplayBalance', value);
         setDisplayBalance(value);
       },
       onComplete: () => {
+        console.log('onComplete setDisplayBalance', newBalance);
         setBalance(newBalance);
         setDisplayBalance(newBalance);
-        setIsAnimating(false);
-        setChangeAmount(0);
-        setDiffStartIndex(-1);
-        setAnimatingCoins([]);
+        // Pause a bit on the final state before clearing highlight
+        const holdTimer = setTimeout(() => {
+          console.log('holdTimer setIsAnimating false');
+          setIsAnimating(false);
+          setChangeAmount(0);
+          setDiffStartIndex(-1);
+          setAnimatingCoins([]);
+        }, HOLD_AFTER_MS);
       }
     });
   };
@@ -99,11 +111,8 @@ const BalanceCounter = () => {
   // During animation, find which digits should be colored
   const shouldColorDigit = (index) => {
     if (!isAnimating || changeAmount === 0) return false;
-    
-    const originalBalance = balance - changeAmount;
-    const firstDiffPos = getFirstDifferingPosition(originalBalance, balance);
-    
-    return firstDiffPos >= 0 && index >= firstDiffPos;
+    // Use the precomputed index so highlight persists during the end hold
+    return diffStartIndex >= 0 && index >= diffStartIndex;
   };
 
   return (
@@ -153,35 +162,121 @@ const BalanceCounter = () => {
             ref={balanceIconRef}
             className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg"
             animate={isAnimating ? { 
-              scale: [1, 1.1, 1],
+              scale: [1, 1.3, 1.3, 1],
               rotate: isCredit ? [0, 5, 0] : [0, -5, 0]
             } : {}}
-            transition={{ duration: 0.5 * animationSpeed, repeat: isAnimating ? Infinity : 0 }}
+            transition={{ duration: animDuration, times: [0, 0.15, 0.85, 1], ease: "easeInOut" }}
           >
             $
           </motion.div>
           
           <div className="flex items-center">
+            {(() => {
+              const result = [];
+              let i = 0;
+              
+              while (i < digits.length) {
+                const shouldColor = shouldColorDigit(i);
+                
+                if (shouldColor) {
+                  // Find the end of this highlighted group
+                  let groupEnd = i;
+                  while (groupEnd < digits.length - 1 && shouldColorDigit(groupEnd + 1)) {
+                    groupEnd++;
+                  }
+                  
+                  // Render the highlighted group with scaling
+                  const groupDigits = digits.slice(i, groupEnd + 1);
+                  result.push(
+                    <motion.span
+                      key={`highlighted-group-${animId}-${i}`}
+                      className="inline-flex origin-left"
+                      style={{ color: '#1f2937' }}
+                      animate={isAnimating ? {
+                        scale: [1, 1.3, 1.3, 1],
+                        color: [
+                          '#1f2937',
+                          isCredit ? '#22c55e' : '#f97316',
+                          isCredit ? '#22c55e' : '#f97316',
+                          '#1f2937'
+                        ]
+                      } : { scale: 1 }}
+                      transition={{
+                        duration: animDuration,
+                        times: [0, 0.15, 0.85, 1],
+                        ease: "easeInOut"
+                      }}
+                    >
+                      {groupDigits.map((groupDigit, groupIndex) => (
+                        <span
+                          key={`group-${i + groupIndex}-${groupDigit}`}
+                          className={`text-5xl font-bold inline-block leading-none ${groupDigit === ',' ? 'mx-1' : ''}`}
+                        >
+                          {groupDigit}
+                        </span>
+                      ))}
+                    </motion.span>
+                  );
+                  
+                  // Skip to after this group
+                  i = groupEnd + 1;
+                } else {
+                  // Render non-highlighted digit normally
+                  result.push(
+                    <span
+                      key={`static-${animId}-${i}`}
+                      className={`text-5xl font-bold inline-block leading-none transition-colors duration-200 text-gray-800 ${digits[i] === ',' ? 'mx-1' : ''}`}
+                    >
+                      {digits[i]}
+                    </span>
+                  );
+                  i++;
+                }
+              }
+              
+              return result;
+            })()}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* DEBUG: Individual Digit Scaling (Wrong Approach) */}
+      <motion.div 
+        className="bg-red-50/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 mb-4 border-2 border-red-200 relative z-10"
+      >
+        <div className="text-center mb-2">
+          <span className="text-sm font-semibold text-red-600 bg-red-100 px-3 py-1 rounded-full">
+            DEBUG: Individual Digit Scaling (WRONG)
+          </span>
+        </div>
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg">
+            $
+          </div>
+          
+          <div className="flex items-center">
             {digits.map((digit, index) => {
-              const shouldColor = shouldColorDigit(index);
-              const shouldScale = shouldColor && isAnimating;
+              // Force half the digits to be in "animated" state for debugging
+              const forceAnimated = index >= Math.floor(digits.length / 2);
+              const debugShouldColor = forceAnimated;
+              const debugShouldScale = forceAnimated;
               
               return (
                 <motion.span
-                  key={`${index}-${digit}-${Math.round(displayBalance)}`}
+                  key={`debug-individual-${index}-${digit}`}
                   className={`text-5xl font-bold inline-block leading-none transition-colors duration-200 ${
-                    shouldColor
-                      ? isCredit 
-                        ? 'text-green-500' 
-                        : 'text-orange-500'
+                    debugShouldColor
+                      ? 'text-red-500' 
                       : 'text-gray-800'
                   } ${digit === ',' ? 'mx-1' : ''}`}
-                  animate={shouldScale ? {
-                    scale: [1, 1.28, 1.12, 1],
+                  animate={debugShouldScale ? {
+                    scale: [1, 1.3, 1.3, 1],
                   } : { scale: 1 }}
                   transition={{
-                    duration: 0.6 * animationSpeed,
-                    ease: "easeOut"
+                    duration: animDuration,
+                    times: [0, 0.15, 0.85, 1],
+                    ease: "easeInOut",
+                    repeat: Infinity
                   }}
                 >
                   {digit}
@@ -189,6 +284,95 @@ const BalanceCounter = () => {
               );
             })}
           </div>
+        </div>
+        <div className="text-center text-xs text-gray-600 mt-2">
+          <div>❌ Individual digits scale separately (wrong approach)</div>
+        </div>
+      </motion.div>
+
+      {/* DEBUG: Partial Group Scaling (Correct Approach) */}
+      <motion.div 
+        className="bg-green-50/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 mb-8 border-2 border-green-200 relative z-10"
+      >
+        <div className="text-center mb-2">
+          <span className="text-sm font-semibold text-green-600 bg-green-100 px-3 py-1 rounded-full">
+            DEBUG: Partial Group Scaling (CORRECT)
+          </span>
+        </div>
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg">
+            $
+          </div>
+          
+          <div className="flex items-center">
+            {(() => {
+              const result = [];
+              let i = 0;
+              
+              while (i < digits.length) {
+                // Force half the digits to be colored for debugging
+                const forceAnimated = i >= Math.floor(digits.length / 2);
+                
+                if (forceAnimated) {
+                  // Find the end of this highlighted group
+                  let groupEnd = i;
+                  while (groupEnd < digits.length - 1 && groupEnd + 1 >= Math.floor(digits.length / 2)) {
+                    groupEnd++;
+                  }
+                  
+                  // Render the highlighted group with scaling
+                  const groupDigits = digits.slice(i, groupEnd + 1);
+                  result.push(
+                    <motion.span
+                      key={`debug-partial-group-${i}`}
+                      className="inline-flex origin-left"
+                      animate={{
+                        scale: [1, 1.3, 1.3, 1],
+                      }}
+                      transition={{
+                        duration: animDuration,
+                        times: [0, 0.15, 0.85, 1],
+                        ease: "easeInOut",
+                        repeat: Infinity
+                      }}
+                    >
+                      {groupDigits.map((groupDigit, groupIndex) => (
+                        <span
+                          key={`debug-partial-${i + groupIndex}-${groupDigit}`}
+                          className={`text-5xl font-bold inline-block leading-none transition-colors duration-200 text-green-500 ${groupDigit === ',' ? 'mx-1' : ''}`}
+                        >
+                          {groupDigit}
+                        </span>
+                      ))}
+                    </motion.span>
+                  );
+                  
+                  // Skip to after this group
+                  i = groupEnd + 1;
+                } else {
+                  // Render non-highlighted digit normally
+                  result.push(
+                    <span
+                      key={`debug-partial-static-${i}-${digits[i]}`}
+                      className={`text-5xl font-bold inline-block leading-none transition-colors duration-200 text-gray-800 ${digits[i] === ',' ? 'mx-1' : ''}`}
+                    >
+                      {digits[i]}
+                    </span>
+                  );
+                  i++;
+                }
+              }
+              
+              return result;
+            })()}
+          </div>
+        </div>
+        <div className="text-center text-xs text-gray-600 mt-2">
+          <div>✅ Only highlighted changing digits scale together</div>
+          <div>Static digits remain unscaled</div>
+          <div>Current balance: {formatNumber(displayBalance)}</div>
+          <div>Digits array: [{digits.join(', ')}]</div>
+          <div>Total digits: {digits.length}</div>
         </div>
       </motion.div>
 
