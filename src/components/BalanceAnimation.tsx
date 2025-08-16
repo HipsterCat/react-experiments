@@ -10,7 +10,7 @@ type Coin = {
 };
 
 const BalanceCounter = () => {
-  const [balance, setBalance] = useState<number>(100);
+  const [balance, setBalance] = useState<number>(200000);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [animatingCoins, setAnimatingCoins] = useState<Coin[]>([]);
   const [changeAmount, setChangeAmount] = useState<number>(0);
@@ -32,6 +32,10 @@ const BalanceCounter = () => {
   const DIGIT_PX = 10;
   const COMMA_PX = 4;
   const HIGHLIGHT_SCALE = 1.4;
+  
+  // Coin animation constraints
+  const MAX_COIN_OFFSET = 30; // Maximum negative X offset for coin arc
+  const MAX_Y_OFFSET = 30; // Maximum Y offset from minimum Y position
 
   // Format number with comma separators
   const formatNumber = (num: number): string => {
@@ -82,9 +86,18 @@ const BalanceCounter = () => {
     // Create coins along an arc
     const coinCount = Math.min(Math.max(Math.floor(Math.abs(amount) / 1000), 4), 12);
     const coins = Array.from({ length: coinCount }, (_, i) => {
-      const arcOffset = (Math.random() - 0.5) * 80;
-      const midX = (from.x + to.x) / 2 + arcOffset;
-      const midY = Math.min(from.y, to.y) - 120 - Math.random() * 40;
+      // Create symmetric pattern: half coins negative midX, half positive midX
+      const isLeftSide = i < coinCount / 2;
+      const midX = isLeftSide 
+        ? -Math.random() * MAX_COIN_OFFSET  // Negative midX for left side
+        : Math.random() * MAX_COIN_OFFSET;  // Positive midX for right side
+      // Y offset limited to not go higher than -MAX_Y_OFFSET
+      const baseY = Math.min(from.y, to.y);
+      const midY = baseY - Math.random() * MAX_Y_OFFSET;
+      console.log('coins coinCount', coinCount);
+      console.log('coins baseY', baseY);
+      console.log('coins midX', midX, 'midY', midY);
+      console.log('coins from', from.x, from.y, 'to', to.x, to.y);
       return {
         id: Date.now() + i,
         isCredit: amount > 0,
@@ -160,19 +173,16 @@ const BalanceCounter = () => {
             initial={{
               x: coin.keyframesX[0],
               y: coin.keyframesY[0],
-              scale: 0.5,
-              opacity: 0
+              scale: 0.0
             }}
             animate={{
               x: coin.keyframesX,
               y: coin.keyframesY,
-              scale: [0.5, 1.1, 0.8],
-              opacity: [0, 1, 0.2]
-            }}
+              scale: [0.0, 1.0, 1.0, 1.0, 0.0]            }}
             transition={{
               duration: 1.2 * animationSpeed,
               delay: coin.delay,
-              ease: "easeOut"
+              ease: "easeInOut"
             }}
           >
             <img src="/src/assets/icon_coin.webp" alt="Coin" className="w-full h-full object-contain" />
@@ -279,7 +289,7 @@ const BalanceCounter = () => {
             top: '7px'
           }}
           animate={isAnimating ? { 
-            scale: [1, 1.5, 1.5, 1],
+            scale: [1, 1.5, 1.5, 1.5, 1.5, 1],
             x: [0, -4, -4, 0]
                     } : {}}
           transition={{ duration: animDuration, times: [0, 0.15, 0.85, 1], ease: "easeInOut" }}
