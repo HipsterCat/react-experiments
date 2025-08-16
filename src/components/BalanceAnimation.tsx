@@ -96,10 +96,10 @@ const BalanceCounter = () => {
       // Y offset limited to not go higher than -MAX_Y_OFFSET
       const baseY = Math.min(from.y, to.y);
       const midY = baseY - Math.random() * MAX_Y_OFFSET;
-      console.log('coins coinCount', coinCount);
-      console.log('coins baseY', baseY);
-      console.log('coins midX', midX, 'midY', midY);
-      console.log('coins from', from.x, from.y, 'to', to.x, to.y);
+      // console.log('coins coinCount', coinCount);
+      // console.log('coins baseY', baseY);
+      // console.log('coins midX', midX, 'midY', midY);
+      // console.log('coins from', from.x, from.y, 'to', to.x, to.y);
       return {
         id: Date.now() + i,
         isCredit: amount > 0,
@@ -114,11 +114,11 @@ const BalanceCounter = () => {
     const duration = Math.min(Math.abs(amount) / 8000 + 1.2, 3) * animationSpeed;
     setAnimDuration(duration);
     animate(motionValue, newBalance, {
-      duration: countingAnimationDuration,
-      ease: "easeOut",
-      onUpdate: (value) => {
-        console.log('onUpdate setDisplayBalance', value);
-        setDisplayBalance(value);
+      duration: countingAnimationDuration * animationSpeed,
+      ease: [0.25, 0.46, 0.45, 0.94], // Start fast, then DRAMATICALLY slow down at the end
+      onUpdate: (motionValue) => {
+        console.log('onUpdate setDisplayBalance', motionValue);
+        setDisplayBalance(motionValue);
       },
       onComplete: () => {
         console.log('onComplete setDisplayBalance', newBalance);
@@ -233,19 +233,23 @@ const BalanceCounter = () => {
                       className="inline-flex origin-left tabular-nums"
                       style={{ color: '#1f2937', fontSize: '1rem' }}
                       animate={isAnimating ? {
-                        fontSize: ['1rem', '1.4rem', '1.4rem', '1rem'],
+                        fontSize: ['1rem', '1rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1rem'],
                         color: [
                           '#1f2937',
-                          isCredit ? '#22c55e' : '#f97316',
-                          isCredit ? '#22c55e' : '#f97316',
+                          '#1f2937',
+                            isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
                           '#1f2937'
                         ],
-                        marginBottom: ['0px', '1px', '1px', '0px']
+                        marginBottom: ['0px', '1px', '1px', '1px', '1px', '1px', '1px', '0px', '0px']
                       } : { fontSize: '1rem' }}
                       transition={{
-                        duration: countingAnimationDuration,
-                        times: [0, 0.15, 0.85, 1],
-                        ease: "easeInOut"
+                        duration: countingAnimationDuration * animationSpeed,
+                        times: [0, 0.85, 0.85, 0.15, 1],
+                        ease: "easeOut"
                       }}
                     >
                       {groupDigits.map((groupDigit, groupIndex) => (
@@ -294,7 +298,7 @@ const BalanceCounter = () => {
             scale: [1, 1.5, 1.5, 1.5, 1.5, 1],
             x: [0, -4, -4, 0]
                     } : {}}
-          transition={{ duration: countingAnimationDuration, times: [0, 0.15, 0.85, 1], ease: "easeInOut" }}
+          transition={{ duration: countingAnimationDuration * animationSpeed, times: [0, 0.15, 0.85, 1], ease: "easeInOut" }}
         >
           <img src="/src/assets/icon_coin.webp" alt="Coin" className="w-full h-full object-contain" />
         </motion.div>
