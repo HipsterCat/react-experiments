@@ -36,7 +36,7 @@ const BalanceCounter = () => {
   const HIGHLIGHT_SCALE = 1.4;
   
   // Coin animation constraints
-  const MAX_COIN_OFFSET = 30; // Maximum negative X offset for coin arc
+  const MAX_X_OFFSET = 30; // Maximum negative X offset for coin arc
   const MAX_Y_OFFSET = 30; // Maximum Y offset from minimum Y position
 
   // Format number with comma separators
@@ -69,7 +69,7 @@ const BalanceCounter = () => {
   };
 
   const changeBalance = (amount: number, buttonIndex: number) => {
-    if (isAnimating) return;
+    if (isAnimating) return; // fix - continue animation if already animating
     const newBalance = balance + amount;
     const oldBalance = balance;
     setAnimId((id) => id + 1);
@@ -80,8 +80,8 @@ const BalanceCounter = () => {
     // DOM based positions
     const buttonEl = buttonRefs[buttonIndex]?.current as HTMLElement | null;
     const iconEl = balanceIconRef.current as HTMLElement | null;
-    const from = amount > 0 ? getElementCenter(buttonEl) : getElementCenter(iconEl);
-    const toCenter = amount > 0 ? getElementCenter(iconEl) : getElementCenter(buttonEl);
+    const from = amount > 0 ? getElementCenter(buttonEl) : {x: MAX_X_OFFSET, y: MAX_Y_OFFSET};
+    const toCenter = amount > 0 ? {x: MAX_X_OFFSET, y: MAX_Y_OFFSET} : getElementCenter(buttonEl);
     // Adjust final position to account for coin positioning
     const to = { x: toCenter.x - 8, y: toCenter.y - 7 };
 
@@ -91,8 +91,8 @@ const BalanceCounter = () => {
       // Create symmetric pattern: half coins negative midX, half positive midX
       const isLeftSide = i < coinCount / 2;
       const midX = isLeftSide 
-        ? -Math.random() * MAX_COIN_OFFSET  // Negative midX for left side
-        : Math.random() * MAX_COIN_OFFSET;  // Positive midX for right side
+        ? -Math.random() * MAX_X_OFFSET  // Negative midX for left side
+        : Math.random() * (MAX_X_OFFSET * 4);  // Positive midX for right side
       // Y offset limited to not go higher than -MAX_Y_OFFSET
       const baseY = Math.min(from.y, to.y);
       const midY = baseY - Math.random() * MAX_Y_OFFSET;
@@ -184,7 +184,7 @@ const BalanceCounter = () => {
             transition={{
               duration: countingAnimationDuration * animationSpeed,
               delay: coin.delay,
-              ease: "easeInOut"
+              ease: "easeOut"
             }}
           >
             <img src="/src/assets/icon_coin.webp" alt="Coin" className="w-full h-full object-contain" />
@@ -193,7 +193,7 @@ const BalanceCounter = () => {
       </AnimatePresence>
 
       {/* Balance Display with Icon Overlay */}
-      <div className="relative mb-8">
+      <div className="relative mb-80">
         {/* Balance Container */}
         <motion.div 
           className="bg-white/95 backdrop-blur-sm rounded-2xl pl-1.5 pr-2 relative z-10 flex items-center"
@@ -311,7 +311,6 @@ const BalanceCounter = () => {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => changeBalance(5000, 0)}
-          disabled={isAnimating}
           ref={buttonRefs[0]}
           className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-4 rounded-2xl font-bold shadow-lg transition-all disabled:cursor-not-allowed"
         >
@@ -322,7 +321,6 @@ const BalanceCounter = () => {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => changeBalance(500, 1)}
-          disabled={isAnimating}
           ref={buttonRefs[1]}
           className="bg-gradient-to-r from-green-400 to-green-500 hover:from-green-500 hover:to-green-600 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-4 rounded-2xl font-bold shadow-lg transition-all disabled:cursor-not-allowed"
         >
@@ -333,7 +331,6 @@ const BalanceCounter = () => {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => changeBalance(-2500, 2)}
-          disabled={isAnimating}
           ref={buttonRefs[2]}
           className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-4 rounded-2xl font-bold shadow-lg transition-all disabled:cursor-not-allowed"
         >
@@ -344,7 +341,6 @@ const BalanceCounter = () => {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => changeBalance(-10000, 3)}
-          disabled={isAnimating}
           ref={buttonRefs[3]}
           className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-4 rounded-2xl font-bold shadow-lg transition-all disabled:cursor-not-allowed"
         >
