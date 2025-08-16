@@ -26,6 +26,8 @@ const BalanceCounter = () => {
     useRef<HTMLButtonElement | null>(null),
     useRef<HTMLButtonElement | null>(null)
   ];
+
+  const countingAnimationDuration = 1.2;
   const [animDuration, setAnimDuration] = useState<number>(1);
   const [animId, setAnimId] = useState<number>(0);
   // Width approximation for digits and commas (tune for your design)
@@ -112,7 +114,7 @@ const BalanceCounter = () => {
     const duration = Math.min(Math.abs(amount) / 8000 + 1.2, 3) * animationSpeed;
     setAnimDuration(duration);
     animate(motionValue, newBalance, {
-      duration,
+      duration: countingAnimationDuration,
       ease: "easeOut",
       onUpdate: (value) => {
         console.log('onUpdate setDisplayBalance', value);
@@ -180,7 +182,7 @@ const BalanceCounter = () => {
               y: coin.keyframesY,
               scale: [0.0, 1.0, 1.0, 1.0, 0.0]            }}
             transition={{
-              duration: 1.2 * animationSpeed,
+              duration: countingAnimationDuration * animationSpeed,
               delay: coin.delay,
               ease: "easeInOut"
             }}
@@ -241,7 +243,7 @@ const BalanceCounter = () => {
                         marginBottom: ['0px', '1px', '1px', '0px']
                       } : { fontSize: '1rem' }}
                       transition={{
-                        duration: animDuration,
+                        duration: countingAnimationDuration,
                         times: [0, 0.15, 0.85, 1],
                         ease: "easeInOut"
                       }}
@@ -292,7 +294,7 @@ const BalanceCounter = () => {
             scale: [1, 1.5, 1.5, 1.5, 1.5, 1],
             x: [0, -4, -4, 0]
                     } : {}}
-          transition={{ duration: animDuration, times: [0, 0.15, 0.85, 1], ease: "easeInOut" }}
+          transition={{ duration: countingAnimationDuration, times: [0, 0.15, 0.85, 1], ease: "easeInOut" }}
         >
           <img src="/src/assets/icon_coin.webp" alt="Coin" className="w-full h-full object-contain" />
         </motion.div>
