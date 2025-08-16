@@ -1,0 +1,245 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
+
+const BalanceCounter = () => {
+  const [balance, setBalance] = useState(200000);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [animatingCoins, setAnimatingCoins] = useState([]);
+  const [changeAmount, setChangeAmount] = useState(0);
+  const animationSpeed = 1;
+  const motionValue = useMotionValue(balance);
+  const [displayBalance, setDisplayBalance] = useState(balance);
+  const [diffStartIndex, setDiffStartIndex] = useState(-1);
+  const [targetBalance, setTargetBalance] = useState(balance);
+  const balanceIconRef = useRef(null);
+  const buttonRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
+
+  // Format number with comma separators
+  const formatNumber = (num) => {
+    return Math.round(num).toLocaleString();
+  };
+
+  // Get individual digits for animation
+  const getDigits = (num) => {
+    return formatNumber(num).split('');
+  };
+
+  // Find the first differing digit position (from left)
+  const getFirstDifferingPosition = (oldNum, newNum) => {
+    const oldStr = formatNumber(oldNum);
+    const newStr = formatNumber(newNum);
+    
+    for (let i = 0; i < Math.max(oldStr.length, newStr.length); i++) {
+      if (oldStr[i] !== newStr[i]) {
+        return i;
+      }
+    }
+    return -1;
+  };
+
+  const getElementCenter = (el) => {
+    if (!el) return { x: 0, y: 0 };
+    const rect = el.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  };
+
+  const changeBalance = (amount, buttonIndex) => {
+    if (isAnimating) return;
+    const newBalance = balance + amount;
+    const oldBalance = balance;
+    setTargetBalance(newBalance);
+    setChangeAmount(amount);
+    setIsAnimating(true);
+    setDiffStartIndex(getFirstDifferingPosition(oldBalance, newBalance));
+
+    // DOM based positions
+    const buttonEl = buttonRefs[buttonIndex]?.current;
+    const iconEl = balanceIconRef.current;
+    const from = amount > 0 ? getElementCenter(buttonEl) : getElementCenter(iconEl);
+    const to = amount > 0 ? getElementCenter(iconEl) : getElementCenter(buttonEl);
+
+    // Create coins along an arc
+    const coinCount = Math.min(Math.max(Math.floor(Math.abs(amount) / 1000), 4), 12);
+    const coins = Array.from({ length: coinCount }, (_, i) => {
+      const arcOffset = (Math.random() - 0.5) * 80;
+      const midX = (from.x + to.x) / 2 + arcOffset;
+      const midY = Math.min(from.y, to.y) - 120 - Math.random() * 40;
+      return {
+        id: Date.now() + i,
+        isCredit: amount > 0,
+        delay: i * 0.05,
+        keyframesX: [from.x, midX, to.x],
+        keyframesY: [from.y, midY, to.y]
+      };
+    });
+    setAnimatingCoins(coins);
+
+    // Animate the counter value
+    animate(motionValue, newBalance, {
+      duration: Math.min(Math.abs(amount) / 8000 + 1.2, 3) * animationSpeed,
+      ease: "easeOut",
+      onUpdate: (value) => {
+        setDisplayBalance(value);
+      },
+      onComplete: () => {
+        setBalance(newBalance);
+        setDisplayBalance(newBalance);
+        setIsAnimating(false);
+        setChangeAmount(0);
+        setDiffStartIndex(-1);
+        setAnimatingCoins([]);
+      }
+    });
+  };
+
+  const digits = getDigits(displayBalance);
+  const isCredit = changeAmount > 0;
+  const isDebit = changeAmount < 0;
+  
+  // During animation, find which digits should be colored
+  const shouldColorDigit = (index) => {
+    if (!isAnimating || changeAmount === 0) return false;
+    
+    const originalBalance = balance - changeAmount;
+    const firstDiffPos = getFirstDifferingPosition(originalBalance, balance);
+    
+    return firstDiffPos >= 0 && index >= firstDiffPos;
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-cyan-200 to-blue-300 p-4 relative overflow-hidden">
+      
+      {/* Animated Coins */}
+      <AnimatePresence>
+        {animatingCoins.map((coin) => (
+          <motion.div
+            key={coin.id}
+            className="fixed top-0 left-0 w-8 h-8 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full border-2 border-yellow-400 flex items-center justify-center text-xs font-bold text-green-700 shadow-xl z-20 pointer-events-none"
+            initial={{
+              x: coin.keyframesX[0],
+              y: coin.keyframesY[0],
+              scale: 0.6,
+              opacity: 0
+            }}
+            animate={{
+              x: coin.keyframesX,
+              y: coin.keyframesY,
+              scale: [0.6, 1.1, 0.8],
+              opacity: [0, 1, 0.2]
+            }}
+            transition={{
+              duration: 1.2 * animationSpeed,
+              delay: coin.delay,
+              ease: "easeOut"
+            }}
+          >
+            $
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {/* Balance Display */}
+      <motion.div 
+        className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 mb-8 border border-white/20 relative z-10"
+        animate={isAnimating ? { 
+          boxShadow: isCredit 
+            ? "0 0 30px rgba(34, 197, 94, 0.3)" 
+            : "0 0 30px rgba(249, 115, 22, 0.3)" 
+        } : {}}
+        transition={{ duration: 0.3 * animationSpeed }}
+      >
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <motion.div 
+            ref={balanceIconRef}
+            className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg"
+            animate={isAnimating ? { 
+              scale: [1, 1.1, 1],
+              rotate: isCredit ? [0, 5, 0] : [0, -5, 0]
+            } : {}}
+            transition={{ duration: 0.5 * animationSpeed, repeat: isAnimating ? Infinity : 0 }}
+          >
+            $
+          </motion.div>
+          
+          <div className="flex items-center">
+            {digits.map((digit, index) => {
+              const shouldColor = shouldColorDigit(index);
+              const shouldScale = shouldColor && isAnimating;
+              
+              return (
+                <motion.span
+                  key={`${index}-${digit}-${Math.round(displayBalance)}`}
+                  className={`text-5xl font-bold inline-block leading-none transition-colors duration-200 ${
+                    shouldColor
+                      ? isCredit 
+                        ? 'text-green-500' 
+                        : 'text-orange-500'
+                      : 'text-gray-800'
+                  } ${digit === ',' ? 'mx-1' : ''}`}
+                  animate={shouldScale ? {
+                    scale: [1, 1.28, 1.12, 1],
+                  } : { scale: 1 }}
+                  transition={{
+                    duration: 0.6 * animationSpeed,
+                    ease: "easeOut"
+                  }}
+                >
+                  {digit}
+                </motion.span>
+              );
+            })}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Control Buttons */}
+      <div className="grid grid-cols-2 gap-4 w-full max-w-md relative z-10">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => changeBalance(5000, 0)}
+          disabled={isAnimating}
+          ref={buttonRefs[0]}
+          className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-4 rounded-2xl font-bold shadow-lg transition-all disabled:cursor-not-allowed"
+        >
+          + $5,000
+        </motion.button>
+        
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => changeBalance(500, 1)}
+          disabled={isAnimating}
+          ref={buttonRefs[1]}
+          className="bg-gradient-to-r from-green-400 to-green-500 hover:from-green-500 hover:to-green-600 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-4 rounded-2xl font-bold shadow-lg transition-all disabled:cursor-not-allowed"
+        >
+          + $500
+        </motion.button>
+        
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => changeBalance(-2500, 2)}
+          disabled={isAnimating}
+          ref={buttonRefs[2]}
+          className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-4 rounded-2xl font-bold shadow-lg transition-all disabled:cursor-not-allowed"
+        >
+          - $2,500
+        </motion.button>
+        
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => changeBalance(-10000, 3)}
+          disabled={isAnimating}
+          ref={buttonRefs[3]}
+          className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-4 rounded-2xl font-bold shadow-lg transition-all disabled:cursor-not-allowed"
+        >
+          - $10,000
+        </motion.button>
+      </div>
+    </div>
+  );
+};
+
+export default BalanceCounter;
