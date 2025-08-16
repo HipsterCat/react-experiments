@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion';
 
 type Coin = {
@@ -14,6 +14,8 @@ const BalanceCounter = () => {
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [animatingCoins, setAnimatingCoins] = useState<Coin[]>([]);
   const [changeAmount, setChangeAmount] = useState<number>(0);
+  const [alwaysVisible, setAlwaysVisible] = useState<boolean>(true);
+  const [balanceVisible, setBalanceVisible] = useState<boolean>(true);
   const animationSpeed = 1;
   const HOLD_AFTER_MS = 0; // pause on finished number
   const motionValue = useMotionValue(balance);
@@ -27,7 +29,7 @@ const BalanceCounter = () => {
     useRef<HTMLButtonElement | null>(null)
   ];
 
-  const countingAnimationDuration = 1.2;
+  const countingAnimationDuration = 1.0;
   const [animDuration, setAnimDuration] = useState<number>(1);
   const [animId, setAnimId] = useState<number>(0);
   // Width approximation for digits and commas (tune for your design)
@@ -38,6 +40,11 @@ const BalanceCounter = () => {
   // Coin animation constraints
   const MAX_X_OFFSET = 30; // Maximum negative X offset for coin arc
   const MAX_Y_OFFSET = 30; // Maximum Y offset from minimum Y position
+
+  // Update balance visibility when toggle changes
+  useEffect(() => {
+    setBalanceVisible(alwaysVisible);
+  }, [alwaysVisible]);
 
   // Format number with comma separators
   const formatNumber = (num: number): string => {
@@ -74,12 +81,26 @@ const BalanceCounter = () => {
     const oldBalance = balance;
     setAnimId((id) => id + 1);
     setChangeAmount(amount);
-    setIsAnimating(true);
-    setDiffStartIndex(getFirstDifferingPosition(oldBalance, newBalance));
+    
+    // Show balance first if in animation-only mode, then start animating after a brief delay
+    if (!alwaysVisible && !balanceVisible) {
+      setBalanceVisible(true);
+      // Wait for the appearance animation to complete before starting balance animation
+      setTimeout(() => {
+        setIsAnimating(true);
+        setDiffStartIndex(getFirstDifferingPosition(oldBalance, newBalance));
+        startBalanceAnimation(newBalance, buttonIndex, amount);
+      }, 50 * animationSpeed); // Match the appearance transition duration
+    } else {
+      setIsAnimating(true);
+      setDiffStartIndex(getFirstDifferingPosition(oldBalance, newBalance));
+      startBalanceAnimation(newBalance, buttonIndex, amount);
+    }
+  };
 
+  const startBalanceAnimation = (newBalance: number, buttonIndex: number, amount: number) => {
     // DOM based positions
     const buttonEl = buttonRefs[buttonIndex]?.current as HTMLElement | null;
-    const iconEl = balanceIconRef.current as HTMLElement | null;
     const from = amount > 0 ? getElementCenter(buttonEl) : {x: MAX_X_OFFSET, y: MAX_Y_OFFSET};
     const toCenter = amount > 0 ? {x: MAX_X_OFFSET, y: MAX_Y_OFFSET} : getElementCenter(buttonEl);
     // Adjust final position to account for coin positioning
@@ -111,11 +132,11 @@ const BalanceCounter = () => {
     setAnimatingCoins(coins);
 
     // Animate the counter value
-    const duration = Math.min(Math.abs(amount) / 8000 + 1.2, 3) * animationSpeed;
-    setAnimDuration(duration);
+    // const duration = Math.min(Math.abs(amount) / 8000 + 1.2, 3) * animationSpeed;
+    // setAnimDuration(duration);
     animate(motionValue, newBalance, {
       duration: countingAnimationDuration * animationSpeed,
-      ease: [0.25, 0.46, 0.45, 0.94], // Start fast, then DRAMATICALLY slow down at the end
+      ease: "easeOut", // Start fast, then DRAMATICALLY slow down at the end
       onUpdate: (motionValue) => {
         console.log('onUpdate setDisplayBalance', motionValue);
         setDisplayBalance(motionValue);
@@ -131,6 +152,13 @@ const BalanceCounter = () => {
           setChangeAmount(0);
           setDiffStartIndex(-1);
           setAnimatingCoins([]);
+          
+          // Hide balance after delay if in animation-only mode
+          if (!alwaysVisible) {
+            setTimeout(() => {
+              setBalanceVisible(false);
+            }, 2000); // 2 seconds delay before hiding
+          }
         }, HOLD_AFTER_MS);
       }
     });
@@ -194,116 +222,173 @@ const BalanceCounter = () => {
 
       {/* Balance Display with Icon Overlay */}
       <div className="relative mb-80">
-        {/* Balance Container */}
-        <motion.div 
-          className="bg-white/95 backdrop-blur-sm rounded-2xl pl-1.5 pr-2 relative z-10 flex items-center"
-          style={{ 
-            height: '30px',
-            outline: '1px solid rgba(0, 0, 0, 0.15)',
-            boxShadow: '0 0 20px 0 rgba(0, 0, 0, 0.20)',
+        {/* Animated Wrapper for Balance and Icon */}
+        <motion.div
+          initial={!alwaysVisible ? { opacity: 0, scale: 0.5 } : { opacity: 1, scale: 1 }}
+          animate={balanceVisible ? { 
+            opacity: 1, 
+            scale: [0.5, 1.25, 1] 
+          } : { 
+            opacity: 0, 
+            scale: 0.5 
           }}
-          transition={{ duration: 0.3 * animationSpeed }}
-        >
-          <div className="flex items-center" style={{ gap: '2px' }}>
-            {/* Invisible placeholder to maintain spacing */}
-            <div className="w-4 h-4 flex items-center justify-center">
-            </div>
-          
-          <div className="flex items-center">
-            <div className="flex items-center text-base font-bold leading-5 whitespace-nowrap">
-                {(() => {
-              const result = [];
-              let i = 0;
-              
-              while (i < digits.length) {
-                const shouldColor = shouldColorDigit(i);
-                
-                if (shouldColor) {
-                  // Find the end of this highlighted group
-                  let groupEnd = i;
-                  while (groupEnd < digits.length - 1 && shouldColorDigit(groupEnd + 1)) {
-                    groupEnd++;
+          transition={
+            balanceVisible 
+              ? { 
+                  opacity: { duration: 0.1 * animationSpeed },
+                  scale: { 
+                    duration: 0.3 * animationSpeed,
+                    ease: "easeInOut"
                   }
-                  
-                  // Render the highlighted group with scaling
-                  const groupDigits = digits.slice(i, groupEnd + 1);
-                  result.push(
-                    <motion.span
-                      key={`highlighted-group-${animId}-${i}`}
-                      className="inline-flex origin-left tabular-nums"
-                      style={{ color: '#1f2937', fontSize: '1rem' }}
-                      animate={isAnimating ? {
-                        fontSize: ['1rem', '1rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1rem'],
-                        color: [
-                          '#1f2937',
-                          '#1f2937',
-                            isCredit ? '#22c55e' : '#f97316',
-                            isCredit ? '#22c55e' : '#f97316',
-                            isCredit ? '#22c55e' : '#f97316',
-                            isCredit ? '#22c55e' : '#f97316',
-                            isCredit ? '#22c55e' : '#f97316',
-                          '#1f2937'
-                        ],
-                        marginBottom: ['0px', '1px', '1px', '1px', '1px', '1px', '1px', '0px', '0px']
-                      } : { fontSize: '1rem' }}
-                      transition={{
-                        duration: countingAnimationDuration * animationSpeed,
-                        times: [0, 0.85, 0.85, 0.15, 1],
-                        ease: "easeOut"
-                      }}
-                    >
-                      {groupDigits.map((groupDigit, groupIndex) => (
-                        <span
-                          key={`group-${i + groupIndex}-${groupDigit}`}
-                          className={`inline-block`}
-                        >
-                          {groupDigit}
-                        </span>
-                      ))}
-                    </motion.span>
-                  );
-                  
-                  // Skip to after this group
-                  i = groupEnd + 1;
-                } else {
-                  // Render non-highlighted digit normally
-                  result.push(
-                    <span
-                      key={`static-${animId}-${i}`}
-                      className={`inline-block transition-colors duration-200 text-gray-800`}
-                    >
-                      {digits[i]}
-                    </span>
-                  );
-                  i++;
                 }
-              }
-              
-                  return result;
-                })()}
-            </div>
+              : { duration: 0.3 * animationSpeed }
+          }
+          className="relative"
+          style={{ transformOrigin: 'top left' }}
+        >
+          {/* Balance Container */}
+          <div 
+            className="bg-white/95 backdrop-blur-sm rounded-2xl pl-1.5 pr-2 relative z-10 flex items-center"
+            style={{ 
+              height: '30px',
+              outline: '1px solid rgba(0, 0, 0, 0.15)',
+              boxShadow: '0 0 20px 0 rgba(0, 0, 0, 0.20)',
+            }}
+          >
+            <div className="flex items-center" style={{ gap: '2px' }}>
+              {/* Invisible placeholder to maintain spacing */}
+              <div className="w-4 h-4 flex items-center justify-center">
+              </div>
+            
+            <div className="flex items-center">
+              <div className="flex items-center text-base font-bold leading-5 whitespace-nowrap">
+                  {(() => {
+                const result = [];
+                let i = 0;
+                
+                while (i < digits.length) {
+                  const shouldColor = shouldColorDigit(i);
+                  
+                  if (shouldColor) {
+                    // Find the end of this highlighted group
+                    let groupEnd = i;
+                    while (groupEnd < digits.length - 1 && shouldColorDigit(groupEnd + 1)) {
+                      groupEnd++;
+                    }
+                    
+                    // Render the highlighted group with scaling
+                    const groupDigits = digits.slice(i, groupEnd + 1);
+                    result.push(
+                      <motion.span
+                        key={`highlighted-group-${animId}-${i}`}
+                        className="inline-flex origin-left tabular-nums"
+                        style={{ color: '#1f2937', fontSize: '1rem' }}
+                        animate={isAnimating ? {
+                          fontSize: ['1rem', '1rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1rem'],
+                          color: [
+                            '#1f2937',
+                            '#1f2937',
+                              isCredit ? '#22c55e' : '#f97316',
+                              isCredit ? '#22c55e' : '#f97316',
+                              isCredit ? '#22c55e' : '#f97316',
+                              isCredit ? '#22c55e' : '#f97316',
+                              isCredit ? '#22c55e' : '#f97316',
+                            '#1f2937'
+                          ],
+                          marginBottom: ['0px', '1px', '1px', '1px', '1px', '1px', '1px', '0px', '0px']
+                        } : { fontSize: '1rem' }}
+                        transition={{
+                          duration: countingAnimationDuration * animationSpeed,
+                          ease: "easeOut"
+                        }}
+                      >
+                        {groupDigits.map((groupDigit, groupIndex) => (
+                          <span
+                            key={`group-${i + groupIndex}-${groupDigit}`}
+                            className={`inline-block`}
+                          >
+                            {groupDigit}
+                          </span>
+                        ))}
+                      </motion.span>
+                    );
+                    
+                    // Skip to after this group
+                    i = groupEnd + 1;
+                  } else {
+                    // Render non-highlighted digit normally
+                    result.push(
+                      <span
+                        key={`static-${animId}-${i}`}
+                        className={`inline-block transition-colors duration-200 text-gray-800`}
+                      >
+                        {digits[i]}
+                      </span>
+                    );
+                    i++;
+                  }
+                }
+                
+                    return result;
+                  })()}
+              </div>
+              </div>
             </div>
           </div>
-        </motion.div>
-        
-        {/* Blue Dollar Icon - Positioned absolutely on top */}
-        <motion.div 
-          ref={balanceIconRef}
-          className="absolute w-4 h-4 flex items-center justify-center z-30 pointer-events-none"
-          style={{
-            left: '6px',
-            top: '7px'
-          }}
-          animate={isAnimating ? { 
-            scale: [1, 1.5, 1.5, 1.5, 1.5, 1],
-            x: [0, -4, -4, 0]
-                    } : {}}
-          transition={{ duration: countingAnimationDuration * animationSpeed, times: [0, 0.15, 0.85, 1], ease: "easeInOut" }}
-        >
-          <img src="/src/assets/icon_coin.webp" alt="Coin" className="w-full h-full object-contain" />
+          
+          {/* Blue Dollar Icon - Positioned absolutely on top */}
+          <motion.div 
+            ref={balanceIconRef}
+            className="absolute w-4 h-4 flex items-center justify-center z-30 pointer-events-none"
+            style={{
+              left: '6px',
+              top: '7px'
+            }}
+            animate={isAnimating ? { 
+              scale: [1, 1.5, 1.5, 1.5, 1.5, 1],
+              x: [0, -4, -4, 0]
+            } : { scale: 1, x: 0 }}
+            transition={{ duration: countingAnimationDuration * animationSpeed, times: [0, 0.15, 0.85, 1], ease: "easeOut" }}
+          >
+            <img src="/src/assets/icon_coin.webp" alt="Coin" className="w-full h-full object-contain" />
+          </motion.div>
         </motion.div>
       </div>
 
+
+      {/* Toggle Control */}
+      <div className="mb-6 w-full max-w-md relative z-10">
+        <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">
+              Balance Visibility Mode
+            </span>
+            <div className="flex items-center space-x-3">
+              <span className={`text-xs ${alwaysVisible ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
+                Always Visible
+              </span>
+              <motion.button
+                className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                  alwaysVisible ? 'bg-blue-500' : 'bg-gray-300'
+                }`}
+                onClick={() => setAlwaysVisible(!alwaysVisible)}
+                whileTap={{ scale: 0.95 }}
+              >
+                <motion.div
+                  className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md"
+                  animate={{
+                    x: alwaysVisible ? 1 : 25
+                  }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+              </motion.button>
+              <span className={`text-xs ${!alwaysVisible ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
+                Animation Only
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Control Buttons */}
       <div className="grid grid-cols-2 gap-4 w-full max-w-md relative z-10">
