@@ -6,7 +6,6 @@ import coin_50_icon from "../assets/boxes/rewards/reward_coins_50.webp";
 import usdt_1_icon from "../assets/boxes/rewards/reward_usdt_1.webp";
 import usdt_20_icon from "../assets/boxes/rewards/reward_usdt_20.webp";
 import usdt_50_icon from "../assets/boxes/rewards/reward_usdt_50.webp";
-import mystery_box_icon from "../assets/boxes/rewards/mystery_box.webp";
 import question_icon from "../assets/boxes/rewards/question.webp";
 import telegram_icon from "../assets/boxes/rewards/telegram.webp";
 import box_epic_icon from "../assets/boxes/rewards/box_epic.webp";
@@ -18,6 +17,7 @@ import { RewardTypeBadge } from "./RewardTypeBadge";
 import clsx from "clsx";
 import { RewardBoxRareBadge } from "./RewardBoxRareBadge";
 import { WheelSpinState } from "./PrizeCarousel";
+import { useEffect, useRef } from "react";
 
 const getRewardIcon = (
   reward: InventoryReward
@@ -74,17 +74,36 @@ export function RewardTypeImage({
   className,
   badgeSize,
   wheelSpinState,
+  onLoaded,
 }: {
   reward: InventoryReward;
   className: string;
   badgeSize?: "s" | "m";
   wheelSpinState?: WheelSpinState;
+  onLoaded?: () => void;
 }) {
   const { icon, sPosition } = getRewardIcon(reward);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  // If image is already cached/loaded, fire onLoaded immediately when icon changes
+  useEffect(() => {
+    if (!onLoaded) return;
+    const img = imgRef.current;
+    if (img && img.complete) {
+      onLoaded();
+    }
+  }, [icon, onLoaded]);
 
   return (
     <div className={clsx(className, "relative")}>
-      <img src={icon} alt="" className="w-full h-full" />
+      <img
+        ref={imgRef}
+        src={icon}
+        alt=""
+        className="w-full h-full"
+        onLoad={onLoaded}
+        onError={onLoaded}
+      />
       {wheelSpinState !== 'SPINNING' && <RewardBoxRareBadge reward={reward} />}
       {badgeSize !== null && ((badgeSize === "s" && reward.reward_type !== "box") || badgeSize === "m") && (
         <RewardTypeBadge
@@ -92,7 +111,7 @@ export function RewardTypeImage({
           size={badgeSize}
           className={clsx(
             badgeSize === "s" && `absolute bottom-0 ${sPosition}`,
-            badgeSize === "m" && "mt-5 absolute -bottom-10 left-1/2 transform -translate-x-1/2"
+            badgeSize === "m" && "mt-5 absolute -bottom-20 left-1/2 transform -translate-x-1/2"
           )}
         />
       )}

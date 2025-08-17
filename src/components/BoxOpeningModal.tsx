@@ -1,7 +1,7 @@
 import { fetchProfile, fetchTasks, useBoxOpening, useSnackbar } from "../hooks/useBoxOpening";
 import { AnimatedFullscreen } from "./AnimatedFullscreen";
 import { RewardTypeImage } from "./RewardTypeImage";
-import { ConfettiParticles } from "./particles/ConfettiParticles";
+import { ConfettiParticles } from "./ConfettiParticles";
 import { Button, Text, Title } from "@telegram-apps/telegram-ui";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -25,7 +25,7 @@ const BoxOpeningModal: React.FC = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { isBoxOpeningModalOpen, closeBoxModal, currentBoxId, viewMode, boxContents, switchToWheel, switchView } =
+  const { isBoxOpeningModalOpen, closeBoxModal, currentBoxId, viewMode, boxContents, switchToWheel, switchView, loadBoxContents } =
     useBoxOpening();
   const { showSnackbar } = useSnackbar();
   const { changeBalance, balanceRef } = useBalanceAnimation();
@@ -56,6 +56,7 @@ const BoxOpeningModal: React.FC = () => {
       setShowTopupConfetti(false);
       setHasSpun(false);
       setWheelSpinState(viewMode === 'wheel' ? 'IDLE' : 'STOPPED');
+      console.log('on box change setWheelSpinState setshowrevealanimation false, currentBoxId', currentBoxId, 'viewMode', viewMode, 'wheelSpinState', wheelSpinState);
       setShowRevealAnimation(false);
 
       // Check if we have an error loading box contents
@@ -82,18 +83,28 @@ const BoxOpeningModal: React.FC = () => {
   useEffect(() => {
     if (currentBoxId === undefined) return;
     if (viewMode === 'wheel') {
+      // Always reset to IDLE when entering the wheel from result
       setWheelSpinState('IDLE');
     } else if (viewMode === 'result') {
-      // nothing; result rendering depends on actualReward
+      // Keep STOPPED while in result to keep single item centered
+      setWheelSpinState('STOPPED');
     }
   }, [viewMode, currentBoxId]);
+
+    // What to display in the result view: real reward after spin, or a placeholder box before spin
+    const displayReward = (viewMode === 'result' && !hasSpun)
+    ? { reward_type: 'box', reward_value: currentBoxId || 11 } as ServiceBoxOpenResponse
+    : actualReward;
+
+  const isBox = displayReward ? displayReward.reward_type === "box" : false;
 
   useEffect(() => {
     if (hasSpun && wheelSpinState === "STOPPED" && viewMode === 'wheel') {
       console.log('wheel stopped -> switching to result');
       
       // If it's a box reward, start reveal animation immediately
-      if (actualReward?.reward_type === 'box') {
+      if (displayReward?.reward_type === 'box' && !boxContents.isLoading) {
+        console.log('displayReward -box?, displayReward', displayReward, 'boxContents.isLoading', boxContents.isLoading);
         setShowRevealAnimation(true);
         handleTopupSuccess();
         // Wait for reveal animation to complete before switching view
@@ -109,27 +120,27 @@ const BoxOpeningModal: React.FC = () => {
 
   // Trigger effects when we reach result view after spinning
   useEffect(() => {
-    if (hasSpun && viewMode === 'result' && actualReward) {
+    if (hasSpun && viewMode === 'result' && displayReward) {
       // Trigger confetti for box rewards
-      if (actualReward.reward_type === "box") {
+      if (displayReward?.reward_type === "box" && !boxContents.isLoading) {
         handleTopupSuccess();
       }
       
       // Trigger balance animation for coins or usdt rewards
-      if (actualReward.reward_type === 'coins' || actualReward.reward_type === 'usdt') {
+      if (displayReward.reward_type === 'coins' || displayReward.reward_type === 'usdt') {
         // Set the appropriate balance type
         if (balanceRef.current) {
-          balanceRef.current.setBalanceType(actualReward.reward_type as 'coins' | 'usdt');
+          balanceRef.current.setBalanceType(displayReward.reward_type as 'coins' | 'usdt');
         }
         
         const rewardCoordinates = { 
           x: window.innerWidth / 2, 
           y: window.innerHeight / 2 
         };
-        changeBalance(actualReward.reward_value, rewardCoordinates);
+        changeBalance(displayReward.reward_value, rewardCoordinates);
       }
     }
-  }, [viewMode, actualReward, hasSpun, changeBalance]);
+  }, [viewMode, displayReward, hasSpun, changeBalance]);
 
 
 
@@ -179,15 +190,16 @@ const BoxOpeningModal: React.FC = () => {
 
     try {
       setIsSwitchingToWheel(true);
-      
-      // If opening a box, trigger reveal animation
+
+      // Ensure box contents are loaded BEFORE reveal starts
+      await loadBoxContents(currentBoxId);
+
       if (isBox) {
         setShowRevealAnimation(true);
-        // Wait a bit for the animation to start before switching
         await new Promise(resolve => setTimeout(resolve, 800));
       }
-      
-      await switchToWheel(currentBoxId);
+
+      // Do not switch view yet; wait for onRevealComplete to switch to wheel
     } catch (error) {
       console.error('handleOpenNow failed to switch to wheel:', error);
       showSnackbar('Failed to load box contents', { type: 'error' });
@@ -204,12 +216,7 @@ const BoxOpeningModal: React.FC = () => {
   };
 
 
-  // What to display in the result view: real reward after spin, or a placeholder box before spin
-  const displayReward = (viewMode === 'result' && !hasSpun)
-    ? { reward_type: 'box', reward_value: currentBoxId || 11 } as ServiceBoxOpenResponse
-    : actualReward;
 
-  const isBox = displayReward ? displayReward.reward_type === "box" : false;
   
   // Debug logging
   useEffect(() => {
@@ -283,15 +290,22 @@ const BoxOpeningModal: React.FC = () => {
                 opacity: 1
               }}
               transition={{ duration: 0.5, ease: "easeInOut" }}
-              style={{ pointerEvents: 'none' }}
+              style={{ pointerEvents: 'none', zIndex: 1 }}
             >
               <PrizeCarousel
-                prizes={boxContents.prizes}
+                key={viewMode}
+                prizes={viewMode === 'wheel' ? boxContents.prizes : []}
                 wheelSpinState={wheelSpinState}
                 setSpinState={setWheelSpinState}
                 actualReward={displayReward}
                 showRevealAnimation={showRevealAnimation}
-                onRevealComplete={() => setShowRevealAnimation(false)}
+                onRevealComplete={() => {
+                  setShowRevealAnimation(false);
+                  // Switch to wheel exactly when reveal completes to avoid empty gap
+                  if (viewMode === 'result' && currentBoxId !== undefined) {
+                    switchView('wheel');
+                  }
+                }}
                 onFinalReward={(reward) => {
                   console.log('[BoxOpeningModal] onFinalReward:', reward);
                   setActualReward(reward as any);
@@ -307,7 +321,7 @@ const BoxOpeningModal: React.FC = () => {
                 animate={{
                   opacity: viewMode === 'result' ? 1 : 0,
                   scale: viewMode === 'result' ? 1 : 0.5,
-                  y: viewMode === 'result' ? 0 : 50,
+                  y: viewMode === 'result' ? -40 : 50,
                 }}
                 transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
                 style={{ pointerEvents: viewMode === 'result' ? 'auto' : 'none', zIndex: -1 }}
@@ -321,9 +335,9 @@ const BoxOpeningModal: React.FC = () => {
                         fontSize: 36,
                         lineHeight: "41px",
                         color: "#000",
-                        fontWeight: 600,
+                        fontWeight: 700,
                         zIndex: 1,
-                      marginBottom: "40vh"                   }}
+                      marginBottom: "30vh"                   }}
                     >
                       {t("box_open.you_ve_got")}
                     </Title>
@@ -490,6 +504,7 @@ const BoxOpeningModal: React.FC = () => {
                       >
                         {isSwitchingToWheel || boxContents.isLoading ? 'Loading Box...' : t("box_open.button_open_now")}
                       </Text>
+                      <ConfettiParticles count={40} margin={8} padding={8} />
                     </Button>
                   </>
                 ) : (

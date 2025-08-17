@@ -118,7 +118,7 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
     if (animationType === 'scale') {
       return isAnimating 
         ? 'scale(1) translateY(0)' 
-        : 'scale(0.8) translateY(20px)';
+        : 'scale(0.6) translateY(20px)';
     }
     return isAnimating ? 'translateY(0)' : 'translateY(20px)';
   };

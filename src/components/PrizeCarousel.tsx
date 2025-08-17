@@ -40,13 +40,14 @@ export const PrizeCarousel = ({
     loop: true,
     dragFree: false,
     align: "center",
-    startIndex: Math.floor(items.length / 2),
+    startIndex: 0,
     watchDrag: false,
     skipSnaps: false,
     containScroll: false,
   });
 
   const [selectedIndex, setSelectedIndex] = useState(0);
+  // const prevItemsLengthRef = useRef<number>(items.length);
 
   const intervalRef = useRef<number>();
   const animationRef = useRef<number>();
@@ -64,15 +65,33 @@ export const PrizeCarousel = ({
     });
   }, [selectedIndex, wheelSpinState, showRevealAnimation, actualReward]);
 
-  // Handle reveal completion
+  // Track if the selected reward image finished loading to end reveal precisely
+  const [selectedLoaded, setSelectedLoaded] = useState(false);
   useEffect(() => {
-    if (showRevealAnimation && onRevealComplete) {
-      const timer = setTimeout(() => {
+    if (!showRevealAnimation) setSelectedLoaded(false);
+  }, [showRevealAnimation]);
+
+  useEffect(() => {
+    if (!showRevealAnimation || !onRevealComplete) return;
+    if (!selectedLoaded) return;
+    const timer = setTimeout(() => {
+      onRevealComplete();
+      console.log('[PrizeCarousel] onRevealComplete');
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [showRevealAnimation, onRevealComplete, selectedLoaded]);
+
+  // Fallback: in case image load event misses (cache edge), finish reveal after a short delay
+  useEffect(() => {
+    if (!showRevealAnimation || !onRevealComplete) return;
+    const fallback = setTimeout(() => {
+      if (!selectedLoaded) {
+        console.log('[PrizeCarousel] onRevealComplete (fallback)');
         onRevealComplete();
-      }, 500); // Match the previous animation duration
-      return () => clearTimeout(timer);
-    }
-  }, [showRevealAnimation, onRevealComplete]);
+      }
+    }, 900);
+    return () => clearTimeout(fallback);
+  }, [showRevealAnimation, onRevealComplete, selectedLoaded]);
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
@@ -87,6 +106,8 @@ export const PrizeCarousel = ({
       emblaApi.off("select", onSelect);
     };
   }, [emblaApi, onSelect]);
+
+  // Removed forced re-centering to avoid index jumps after reveal
 
   useEffect(() => {
     const clear = () => {
@@ -178,6 +199,8 @@ export const PrizeCarousel = ({
           if (onFinalReward) {
             try {
               onFinalReward(prizes[finalIndex]);
+              setSelectedIndex(finalIndex);
+
             } catch (e) {
               console.warn("onFinalReward callback failed:", e);
             }
@@ -230,21 +253,32 @@ export const PrizeCarousel = ({
       
       <div className="embla__viewport" ref={emblaRef}>
         <div className="embla__container">
-          {items.map((prize, index) => {
-            const distance = getDistance(index, selectedIndex, items.length);
-            const isCenter = distance === 0;
-            const isSelected = index === selectedIndex;
+          {(() => {
+            const normalizedSelectedIndex = items.length > 0 
+              ? ((selectedIndex % items.length) + items.length) % items.length 
+              : 0;
+            return items.map((prize, index) => {
+              const distance = getDistance(index, normalizedSelectedIndex, items.length);
+              const isCenter = distance === 0;
+              const isSelected = index === normalizedSelectedIndex;
             
+            // When revealing, always show the selected item prominent regardless of spin state
+            const isRevealSelected = Boolean(showRevealAnimation && isSelected);
+
             // Calculate animation values
-            const scaleValue = wheelSpinState === "IDLE" && isCenter ? 1.0 : 
+            const scaleValue = isRevealSelected ? 1.0 :
+                              wheelSpinState === "IDLE" && isCenter ? 1.0 : 
                               wheelSpinState === "IDLE" && distance === 1 ? 0.7 :
                               wheelSpinState === "IDLE" && distance > 1 ? 0.7 :
-                              wheelSpinState === "STOPPED" && isCenter ? 1.2 :
+                              wheelSpinState === "IDLE" && distance === 0 ? 1.0 :
+                              wheelSpinState === "STOPPED" && isCenter ? 1.0 :
                               wheelSpinState === "STOPPED" && !isCenter ? 0 : 
                               wheelSpinState === "SPINNING" ? 0.7 : 1.0;
             
-            const opacityValue = wheelSpinState === "IDLE" && distance === 1 ? 1.0 :
+            const opacityValue = isRevealSelected ? 1 :
+                                wheelSpinState === "IDLE" && distance === 1 ? 1.0 :
                                 wheelSpinState === "IDLE" && distance > 1 ? 0.8 :
+                                wheelSpinState === "IDLE" && distance === 0 ? 1.0 :
                                 wheelSpinState === "STOPPED" && !isCenter ? 0 : 1;
             
             // Debug logging for visibility issues
@@ -253,7 +287,7 @@ export const PrizeCarousel = ({
                 isCenter,
                 isSelected,
                 distance,
-                selectedIndex,
+                selectedIndex: normalizedSelectedIndex,
                 wheelSpinState,
                 showRevealAnimation,
                 scaleValue,
@@ -268,31 +302,33 @@ export const PrizeCarousel = ({
               ? actualReward
               : prize;
 
-            return (
-              <div className="embla__slide" key={`${prize.reward_type}-${prize.reward_value}-${index}`}>
-                <motion.div
-                  className="relative will-change-transform will-change-opacity"
-                  initial={false}
-                  style={{ height: "100%" }}
-                  animate={{
-                    scale: scaleValue,
-                    opacity: opacityValue,
-                  }}
-                  transition={{ 
-                    duration: 0.4, 
-                    ease: [0.34, 1.56, 0.64, 1]
-                  }}
-                >
-                  <RewardTypeImage
-                    reward={displayPrize}
-                    className="w-full h-full"
-                    badgeSize={wheelSpinState === 'SPINNING' ? undefined : (wheelSpinState === 'STOPPED' && (isCenter || isSelected)) ? 'm' : 's'}
-                    wheelSpinState={wheelSpinState}
-                  />
-                </motion.div>
-              </div>
-            );
-          })}
+              return (
+                <div className="embla__slide" key={`${prize.reward_type}-${prize.reward_value}-${index}`}>
+                  <motion.div
+                    className="relative will-change-transform will-change-opacity"
+                    initial={false}
+                    style={{ height: "100%", transformOrigin: "center center" }}
+                    animate={{
+                      scale: scaleValue,
+                      opacity: opacityValue,
+                    }}
+                    transition={{ 
+                      duration: 0.4, 
+                      ease: [0.34, 1.56, 0.64, 1]
+                    }}
+                  >
+                    <RewardTypeImage
+                      reward={displayPrize}
+                      className="w-full h-full"
+                      badgeSize={wheelSpinState === 'SPINNING' ? undefined : (wheelSpinState === 'STOPPED' && (isCenter || isSelected)) ? 'm' : 's'}
+                      wheelSpinState={wheelSpinState}
+                      onLoaded={isRevealSelected ? () => setSelectedLoaded(true) : undefined}
+                    />
+                  </motion.div>
+                </div>
+              );
+            });
+          })()}
         </div>
       </div>
 

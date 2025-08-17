@@ -17,7 +17,7 @@ export function RewardBoxRareBadge({ reward }: { reward: InventoryReward }) {
       case 11:
         return t("reward_type.box_basic");
       default:
-        return null;
+        return t("reward_type.box_basic");
     }
   };
 
@@ -44,7 +44,7 @@ export function RewardBoxRareBadge({ reward }: { reward: InventoryReward }) {
             ? "linear-gradient(180deg, #FFFF00 0%, #FF9900 100%)"
             : reward.reward_value === 11
             ? "linear-gradient(180deg, #CDCDCD 0%, #707070 100%)"
-            : "none",
+            : "linear-gradient(180deg, #CDCDCD 0%, #707070 100%)",
       }}
     >
       <span>{getBoxRareLabel(reward.reward_value)}</span>

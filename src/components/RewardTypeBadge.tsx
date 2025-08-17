@@ -35,11 +35,12 @@ export function RewardTypeBadge({
   return (
     <div
       className={clsx(
-        "bg-white rounded-[40px] inline-flex items-center justify-center px-[10px] py-[5px]",
+        "bg-white rounded-[40px] inline-flex items-center justify-center px-[16px] py-[5px]",
         "text-rounded whitespace-nowrap",
         "font-[800] text-gray-900",
         className,
-        size === "s" && "text-[16px]"
+        size === "s" && "text-[16px]",
+        size === "m" && "text-[24px]"
       )}
       style={{ boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.2)" }}
     >
