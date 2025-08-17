@@ -1,10 +1,9 @@
 import { fetchProfile, fetchTasks, useBoxOpening, useSnackbar } from "../hooks/useBoxOpening";
 import { AnimatedFullscreen } from "./AnimatedFullscreen";
-import { RewardTypeImage } from "./RewardTypeImage";
 import { ConfettiParticles } from "./ConfettiParticles";
 import { Button, Text, Title } from "@telegram-apps/telegram-ui";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "../hooks/useTranslation";
 import { useBalanceAnimation } from "../hooks/useBalanceAnimation";
 import boxOpenBg from "../assets/boxes/boxOpenBg_2.jpg";
@@ -25,7 +24,7 @@ const BoxOpeningModal: React.FC = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { isBoxOpeningModalOpen, closeBoxModal, currentBoxId, viewMode, boxContents, switchToWheel, switchView, loadBoxContents } =
+  const { isBoxOpeningModalOpen, closeBoxModal, currentBoxId, viewMode, boxContents, switchView, loadBoxContents } =
     useBoxOpening();
   const { showSnackbar } = useSnackbar();
   const { changeBalance, balanceRef } = useBalanceAnimation();
@@ -39,7 +38,8 @@ const BoxOpeningModal: React.FC = () => {
   const [isSwitchingToWheel, setIsSwitchingToWheel] = useState(false);
   const [hasSpun, setHasSpun] = useState(false);
   const [showRevealAnimation, setShowRevealAnimation] = useState(false);
-
+  // Guard to avoid duplicate balance animation per spin
+  const hasAppliedRewardRef = useRef(false);
   const handleTopupSuccess = () => {
     setShowTopupConfetti(true);
     setTimeout(() => {
@@ -58,6 +58,7 @@ const BoxOpeningModal: React.FC = () => {
       setWheelSpinState(viewMode === 'wheel' ? 'IDLE' : 'STOPPED');
       console.log('on box change setWheelSpinState setshowrevealanimation false, currentBoxId', currentBoxId, 'viewMode', viewMode, 'wheelSpinState', wheelSpinState);
       setShowRevealAnimation(false);
+      hasAppliedRewardRef.current = false;
 
       // Check if we have an error loading box contents
       if (boxContents.error) {
@@ -76,6 +77,7 @@ const BoxOpeningModal: React.FC = () => {
         setHasSpun(false);
         setShowRevealAnimation(false);
       }, 100);
+      hasAppliedRewardRef.current = false;
     }
   }, [currentBoxId, boxContents.error]);
 
@@ -93,19 +95,20 @@ const BoxOpeningModal: React.FC = () => {
 
     // What to display in the result view: real reward after spin, or a placeholder box before spin
     const displayReward = (viewMode === 'result' && !hasSpun)
-    ? { reward_type: 'box', reward_value: currentBoxId || 11 } as ServiceBoxOpenResponse
+    ? { reward_type: 'box', reward_value: 11 } as ServiceBoxOpenResponse
     : actualReward;
 
   const isBox = displayReward ? displayReward.reward_type === "box" : false;
 
   useEffect(() => {
+    // Do not react if modal is closed
+    if (!isBoxOpeningModalOpen) return;
     if (hasSpun && wheelSpinState === "STOPPED" && viewMode === 'wheel') {
       console.log('wheel stopped -> switching to result');
       
       // If it's a box reward, start reveal animation immediately
-      if (displayReward?.reward_type === 'box' && !boxContents.isLoading) {
+      if (displayReward?.reward_type === 'box') {
         console.log('displayReward -box?, displayReward', displayReward, 'boxContents.isLoading', boxContents.isLoading);
-        setShowRevealAnimation(true);
         handleTopupSuccess();
         // Wait for reveal animation to complete before switching view
         setTimeout(() => {
@@ -116,13 +119,15 @@ const BoxOpeningModal: React.FC = () => {
         switchView('result');
       }
     }
-  }, [hasSpun, wheelSpinState, viewMode, actualReward]);
+  }, [hasSpun, wheelSpinState, viewMode, actualReward, isBoxOpeningModalOpen]);
 
   // Trigger effects when we reach result view after spinning
   useEffect(() => {
+    if (!isBoxOpeningModalOpen) return;
+    if (hasAppliedRewardRef.current) return;
     if (hasSpun && viewMode === 'result' && displayReward) {
       // Trigger confetti for box rewards
-      if (displayReward?.reward_type === "box" && !boxContents.isLoading) {
+      if (displayReward?.reward_type === "box") {
         handleTopupSuccess();
       }
       
@@ -138,9 +143,10 @@ const BoxOpeningModal: React.FC = () => {
           y: window.innerHeight / 2 
         };
         changeBalance(displayReward.reward_value, rewardCoordinates);
+        hasAppliedRewardRef.current = true;
       }
     }
-  }, [viewMode, displayReward, hasSpun, changeBalance]);
+  }, [viewMode, displayReward, hasSpun, changeBalance, isBoxOpeningModalOpen]);
 
 
 
@@ -149,6 +155,7 @@ const BoxOpeningModal: React.FC = () => {
       if (currentBoxId === undefined || isRewardLoading || hasSpun) return;
 
       setRewardLoading(true);
+      hasAppliedRewardRef.current = false;
 
       console.log('startSpinning, openBox', currentBoxId);
       const data = await openBox(String(currentBoxId));
@@ -239,7 +246,7 @@ const BoxOpeningModal: React.FC = () => {
       displayReward.reward_value === 12
     ) {
       return {
-        backgroundImage: `linear-gradient(rgba(126, 255, 243, 0.5), rgba(103, 162, 255, 0.5)), url(${boxOpenBg})`,
+        backgroundImage: `linear-gradient(rgba(93, 155, 255, 0.8), rgba(126, 255, 243, 0.6)), url(${boxOpenBg})`,
       };
     }
     if (
@@ -248,7 +255,7 @@ const BoxOpeningModal: React.FC = () => {
       displayReward.reward_value === 13
     ) {
       return {
-        backgroundImage: `linear-gradient(rgba(238, 206, 243, 0.5), rgba(213, 86, 255, 0.5)), url(${boxOpenBg})`,
+        backgroundImage: `linear-gradient(rgba(238, 86, 255, 0.6), rgba(238, 206, 243, 0.5)), url(${boxOpenBg})`,
       };
     }
     if (
@@ -257,15 +264,25 @@ const BoxOpeningModal: React.FC = () => {
       displayReward.reward_value === 14
     ) {
       return {
-        backgroundImage: `linear-gradient(rgba(239, 255, 151, 0.5), rgba(255, 206, 133, 0.5)), url(${boxOpenBg})`,
+        backgroundImage: `linear-gradient(rgba(255, 206, 133, 0.6), rgba(239, 255, 151, 0.5)), url(${boxOpenBg})`,
+      };
+    }
+    if (
+      (displayReward &&
+      displayReward.reward_type === "box" &&
+      displayReward.reward_value === 11) 
+    ) {
+      return {
+        backgroundImage: `linear-gradient(rgba(206, 243, 240, 1.0), rgba(189, 211, 226, 1.0)), url(${boxOpenBg})`,
       };
     }
     return {
-      backgroundImage: `linear-gradient(rgba(239, 239, 244, 0.5), rgba(239, 239, 244, 0.5)), url(${boxOpenBg})`,
+      backgroundImage: `linear-gradient(rgba(187, 255, 259, 0.6), rgba(168, 255, 157, 0.5)), url(${boxOpenBg})`,
     };
   };
 
   return (
+      console.log('getBg', getBg()),
         <AnimatedFullscreen
       isOpen={isBoxOpeningModalOpen}
       onClose={closeBoxModal}
@@ -274,10 +291,10 @@ const BoxOpeningModal: React.FC = () => {
       closeButtonColor="#000"
       disableTabbarToggle={true}
       overlayImage={overlayImage}
-      showOverlay={wheelSpinState === "SPINNING"}
+      showOverlay={wheelSpinState === "SPINNING" && viewMode === 'wheel'}
     >
-      
-      {showTopupConfetti && <Confetti recycle={false} />}
+
+     {showTopupConfetti && <Confetti recycle={false} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />}
       
       {/* Main Content Area */}
       <div className="flex-1 relative overflow-hidden">
@@ -285,11 +302,13 @@ const BoxOpeningModal: React.FC = () => {
             {/* Wheel layer (kept mounted). Only show/hide, no scaling */}
             <motion.div
               className="absolute inset-0"
-              initial={false}
+              initial={{ opacity: 0, y: -60, scale: 1.3 }}
               animate={{
-                opacity: 1
+                opacity: 1,
+                y: viewMode === 'result' ? -40 : 0,
+                scale: 1,
               }}
-              transition={{ duration: 0.5, ease: "easeInOut" }}
+              transition={{ duration: 0.4, ease: "easeInOut" }}
               style={{ pointerEvents: 'none', zIndex: 1 }}
             >
               <PrizeCarousel
@@ -317,11 +336,11 @@ const BoxOpeningModal: React.FC = () => {
             {displayReward && (
               <motion.div
                 className="absolute inset-0 flex items-center justify-center"
-                initial={false}
+                initial={{ opacity: 0, scale: 0.5, y: 50 }}
                 animate={{
                   opacity: viewMode === 'result' ? 1 : 0,
                   scale: viewMode === 'result' ? 1 : 0.5,
-                  y: viewMode === 'result' ? -40 : 50,
+                  y: viewMode === 'result' ? -40 : 0,
                 }}
                 transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
                 style={{ pointerEvents: viewMode === 'result' ? 'auto' : 'none', zIndex: -1 }}
@@ -337,7 +356,7 @@ const BoxOpeningModal: React.FC = () => {
                         color: "#000",
                         fontWeight: 700,
                         zIndex: 1,
-                      marginBottom: "30vh"                   }}
+                      marginBottom: "40vh"                   }}
                     >
                       {t("box_open.you_ve_got")}
                     </Title>
@@ -350,10 +369,10 @@ const BoxOpeningModal: React.FC = () => {
                           width: '600px',
                           height: '600px',
                           zIndex: -1,
-                          transform: (isBoxOpeningModalOpen) ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.8)',
-                          opacity: (isBoxOpeningModalOpen) ? 0.6 : 0,
-                          transition: 'all 400ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-                          transitionDelay: (isBoxOpeningModalOpen) ? '400ms' : '0ms'
+                          transform: (isBoxOpeningModalOpen) ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.6)',
+                          opacity: (isBoxOpeningModalOpen && isBox) ? 0.7 : (isBoxOpeningModalOpen && !isBox) ? 0.6 : 0,
+                          transition: 'all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                          transitionDelay: (isBoxOpeningModalOpen) ? '800ms' : '0ms'
                         }}
                       >
                         <img 
@@ -374,14 +393,12 @@ const BoxOpeningModal: React.FC = () => {
           </>
       </div>
 
-      {/* Footer with buttons */}
-      {wheelSpinState !== "SPINNING" && (
         <div className="absolute bottom-0 left-0 right-0 z-[999] px-4 pb-4">
           <motion.div 
             className="flex flex-col items-center gap-3"
-            initial={false}
+            initial={{ y: -70 }}
             animate={{
-              opacity: (viewMode === 'result' || wheelSpinState === "IDLE") ? 1 : 0,
+              y: (viewMode === 'result' || wheelSpinState === "IDLE") ? 0 : -70,
             }}
             transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
           >
@@ -395,6 +412,7 @@ const BoxOpeningModal: React.FC = () => {
                 style={{
                   borderRadius: 20,
                   height: 42,
+                  maxWidth: 420,
                 }}
                 loading={isRewardLoading}
               >
@@ -423,6 +441,7 @@ const BoxOpeningModal: React.FC = () => {
                         fontWeight: 590,
                         fontSize: 13,
                         lineHeight: "16px",
+                        maxWidth: 420,
                       }}
                     >
                       {t("box_open.later_open_later_inventory")}
@@ -457,6 +476,7 @@ const BoxOpeningModal: React.FC = () => {
                             fontWeight: 590,
                             fontSize: 15,
                             lineHeight: "20px",
+                            maxWidth: 420,
                           }}
                         >
                           {t("box_open.button_save_inventory")}
@@ -479,9 +499,10 @@ const BoxOpeningModal: React.FC = () => {
                             ? "rgba(112, 0, 203, 1)"
                             : displayReward.reward_value === 14
                             ? "rgba(255, 119, 0, 1)"
-                            : "rgba(0, 201, 255, 1)",
+                            : undefined,
                         transform: 'scale(1)',
                         transition: 'transform 200ms ease',
+                        maxWidth: 420,
                       }}
                       onMouseDown={(e) => {
                         if (!(isSwitchingToWheel || boxContents.isLoading)) {
@@ -516,6 +537,7 @@ const BoxOpeningModal: React.FC = () => {
                     style={{
                       borderRadius: 20,
                       height: 42,
+                      maxWidth: 420,
                     }}
                   >
                     <Text
@@ -532,9 +554,8 @@ const BoxOpeningModal: React.FC = () => {
               </>
             )}
           </motion.div>
-          <BottomSentinelSafeArea />
-        </div>
-      )}
+        <BottomSentinelSafeArea />
+      </div>
     </AnimatedFullscreen>
   );
 };

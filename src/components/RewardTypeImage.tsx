@@ -69,6 +69,7 @@ const getRewardIcon = (
   }
 };
 
+
 export function RewardTypeImage({
   reward,
   className,

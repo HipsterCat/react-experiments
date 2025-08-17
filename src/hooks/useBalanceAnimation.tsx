@@ -16,6 +16,7 @@ export const BalanceAnimationProvider: FC<{ children: ReactNode }> = ({ children
   const changeBalance = (amount: number, fromCoordinates: { x: number; y: number }, balanceType: 'coins' | 'usdt' = 'coins') => {
     if (balanceRef.current) {
       try {
+        console.log('changeBalance', amount, fromCoordinates, balanceType);
         // Switch to the specified balance type if different from current
         balanceRef.current.setBalanceType(balanceType);
         // Then change the balance

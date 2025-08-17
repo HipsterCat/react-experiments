@@ -3,7 +3,7 @@ import { RewardTypeImage } from "./RewardTypeImage";
 import useEmblaCarousel from "embla-carousel-react";
 import type { Dispatch } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 export type WheelSpinState = "IDLE" | "SPINNING" | "STOPPED";
 
@@ -54,6 +54,7 @@ export const PrizeCarousel = ({
 
   const spinStartTimeRef = useRef<number>();
   const lastScrollTimeRef = useRef<number>();
+  const hasSpunRef = useRef<boolean>(false);
 
   // Debug logging
   useEffect(() => {
@@ -132,6 +133,7 @@ export const PrizeCarousel = ({
 
     if (wheelSpinState === "SPINNING") {
       clear();
+      hasSpunRef.current = true;
 
       console.log("=== SPIN START ===");
       console.log("Current Index:", emblaApi.selectedScrollSnap());
@@ -221,9 +223,9 @@ export const PrizeCarousel = ({
       <style>
         {`
           .embla {
-            --slide-height: 25vh;
+            --slide-height: max(160px, min(200px, 25vh));
             --slide-spacing: 5px;
-            --slide-size: 25vh;
+            --slide-size: max(160px, min(200px, 25vh));
           }
           .embla__viewport {
             overflow: hidden;
@@ -237,6 +239,7 @@ export const PrizeCarousel = ({
             flex-direction: column;
             will-change: transform;
             will-change: opacity;
+            padding-bottom: 40px;
           }
           .embla__slide {
             transform: translate3d(0, 0, 0);
@@ -303,6 +306,7 @@ export const PrizeCarousel = ({
               : prize;
 
               return (
+                // console.log("wheelSpinState", wheelSpinState, "scaleValue", scaleValue, "opacityValue", opacityValue, "key", `${prize.reward_type}-${prize.reward_value}-${index}`),
                 <div className="embla__slide" key={`${prize.reward_type}-${prize.reward_value}-${index}`}>
                   <motion.div
                     className="relative will-change-transform will-change-opacity"
@@ -332,22 +336,53 @@ export const PrizeCarousel = ({
         </div>
       </div>
 
-      {wheelSpinState === 'SPINNING' && (
-        <svg
-          className="absolute top-[50%] left-[50%] z-10 ml-[-140px] mt-[-14px]"
-          width="280"
-          height="28"
-          viewBox="0 0 280 28"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          role="presentation"
-        >
-          <path
-            d="M.75 22.403V5.597c0-2.353 2.585-3.79 4.584-2.547l13.517 8.402c1.889 1.174 1.889 3.922 0 5.096L5.334 24.951C3.335 26.193.75 24.756.75 22.403ZM279.75 22.403V5.597c0-2.353-2.585-3.79-4.584-2.547l-13.517 8.402c-1.889 1.174-1.889 3.922 0 5.096l13.517 8.403c1.999 1.242 4.584-.195 4.584-2.548Z"
-            fill="#000"
-          />
-        </svg>
-      )}
+      {(() => {
+        // Simple opacity animation: 0 -> 1 (spinning) -> 0 (stopped)
+        const targetOpacity = wheelSpinState === 'SPINNING' ? 1 : 0;
+        
+        // Gap between arrows: 0 by default (middle), increase when spinning
+        const gap = wheelSpinState === 'SPINNING' ? '190px' : '10px'; // px gap between arrows
+        console.log("gap", gap, "wheelSpinState", wheelSpinState);
+        return (
+       <motion.div 
+            className="pointer-events-none absolute inset-0 flex items-center justify-center z-[-2]"
+            animate={{ 
+              gap: gap,
+              opacity: targetOpacity 
+            }}
+            transition={{ 
+              duration: 0.4, 
+              ease: "easeInOut"
+            }}
+          >
+            {/* Left pointer */}
+            <svg
+              aria-hidden="true"
+              width="20"
+              height="24"
+              viewBox="0 0 20 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              role="presentation"
+            >
+              <path d="M0 20.535V3.46502C0 1.09775 2.61346 -0.336891 4.61063 0.934038L18.0227 9.46902C19.8752 10.6479 19.8752 13.3521 18.0227 14.531L4.61063 23.066C2.61345 24.3369 0 22.9023 0 20.535Z" fill="black"/>
+            </svg>
+
+            {/* Right pointer */}
+            <svg
+              aria-hidden="true"
+              width="20"
+              height="24"
+              viewBox="0 0 20 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              role="presentation"
+            >
+              <path d="M20 20.535V3.46502C20 1.09775 17.3865 -0.336891 15.3894 0.934038L1.97726 9.46902C0.124763 10.6479 0.124767 13.3521 1.97726 14.531L15.3894 23.066C17.3865 24.3369 20 22.9023 20 20.535Z" fill="black"/>
+            </svg>
+          </motion.div>
+        );
+      })()}
     </div>
   );
 };

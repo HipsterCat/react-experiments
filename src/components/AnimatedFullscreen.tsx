@@ -80,6 +80,7 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
 
   const handleClose = () => {
     console.log('handleClose isanimating false');
+    showOverlay = false;
     setIsAnimating(false);
     setTimeout(() => {
       console.log('handleClose onClose after 300ms');
@@ -137,6 +138,7 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
       
       {/* Overlay Layer (above background for blend mode) */}
       {overlayImage && (
+        <div>
         <motion.div
           className="absolute inset-0"
           style={{
@@ -148,8 +150,19 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
           }}
           initial={{ opacity: 0 }}
           animate={{ opacity: showOverlay ? 1 : 0 }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
+          transition={{ duration: 0.4, ease: "easeInOut" }}
         />
+        <motion.div
+          className="absolute inset-0"
+          style={{
+            backgroundColor: `cyan`,
+            mixBlendMode: 'color',
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: showOverlay ? 0.8 : 0 }}
+          transition={{ duration: 0.4, ease: "easeInOut" }}
+        />
+        </div>
       )}
       
 

@@ -44,11 +44,18 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
     return initialBalanceType === 'coins' ? initialCoinsBalance : initialUsdtBalance;
   };
 
-  const [balance, setBalance] = useState<number>(getInitialBalance());
+  // Persistent balances for both types
+  const [coinsBalance, setCoinsBalance] = useState<number>(initialCoinsBalance);
+  const [usdtBalance, setUsdtBalance] = useState<number>(initialUsdtBalance);
+  const [balanceType, setBalanceType] = useState<'coins' | 'usdt'>(initialBalanceType);
+  
+  // Current balance based on type
+  const balance = balanceType === 'coins' ? coinsBalance : usdtBalance;
+  const setBalance = balanceType === 'coins' ? setCoinsBalance : setUsdtBalance;
+  
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [animatingCoins, setAnimatingCoins] = useState<Coin[]>([]);
   const [balanceVisible, setBalanceVisible] = useState<boolean>(true);
-  const [balanceType, setBalanceType] = useState<'coins' | 'usdt'>(initialBalanceType);
   const HOLD_AFTER_MS = 0; // pause on finished number
   const motionValue = useMotionValue(balance);
   const [displayBalance, setDisplayBalance] = useState<number>(balance);
@@ -66,6 +73,8 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   const coinFinishTimerRef = useRef<number | null>(null);
   const coinsRunIdRef = useRef<number>(0);
   const directionRef = useRef<number>(0);
+  // Tracks the sign of the most recent delta so highlight color reflects this call immediately
+  const deltaSignRef = useRef<number>(0);
   
   // Coin animation constraints
   const MAX_X_OFFSET = 30; // Maximum negative X offset for coin arc
@@ -151,6 +160,11 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
     const newTarget = Math.max(0, (isAnimating ? targetRef.current : balance) + amount);
     targetRef.current = newTarget;
 
+    // Record the sign of this change so highlight color is correct immediately
+    deltaSignRef.current = amount > 0 ? 1 : amount < 0 ? -1 : 0;
+    // Also prime direction to avoid a single-frame mismatch before retarget kicks in
+    directionRef.current = deltaSignRef.current;
+
     // Bump animation id to restart highlight/scale timeline
     setAnimId((id) => id + 1);
     setIsAnimating(true);
@@ -233,7 +247,12 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
       onComplete: () => {
         // Ignore if superseded by a newer run
         if (localRunId !== animationRunIdRef.current) return;
-        setBalance(newTarget);
+        // Update the correct balance based on current type
+        if (balanceType === 'coins') {
+          setCoinsBalance(newTarget);
+        } else {
+          setUsdtBalance(newTarget);
+        }
         setDisplayBalance(newTarget);
         // finalization handled by coinFinishTimerRef scheduled in spawnCoins
       }
@@ -246,9 +265,8 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
     getBalanceIconCoordinates,
     setBalanceType: (type: 'coins' | 'usdt') => {
       setBalanceType(type);
-      // Reset balance to appropriate initial value when switching types
-      const newBalance = type === 'coins' ? initialCoinsBalance : initialUsdtBalance;
-      setBalance(newBalance);
+      // Switch to the persistent balance for this type
+      const newBalance = type === 'coins' ? coinsBalance : usdtBalance;
       setDisplayBalance(newBalance);
       motionValue.set(newBalance);
       targetRef.current = newBalance;
@@ -256,7 +274,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   }));
 
   const digits = getDigits(displayBalance);
-  const isCredit = directionRef.current > 0;
+  const isCredit = (deltaSignRef.current !== 0 ? deltaSignRef.current : directionRef.current) > 0;
   
   // During animation, find which digits should be colored
   const shouldColorDigit = (index: number): boolean => {
