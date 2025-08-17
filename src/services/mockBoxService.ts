@@ -8,9 +8,8 @@ const MOCK_REWARDS: InventoryReward[] = [
   { reward_type: "coins", reward_value: 1000 },
   { reward_type: "usdt", reward_value: 1 },
   { reward_type: "usdt", reward_value: 5 },
-  { reward_type: "ton", reward_value: 1 },
-  { reward_type: "ton", reward_value: 2 },
-  { reward_type: "telegram_premium", reward_value: 1 },
+  { reward_type: "usdt", reward_value: 30 },
+  { reward_type: "box", reward_value: 11 },
   { reward_type: "box", reward_value: 12 }, // rare
   { reward_type: "box", reward_value: 13 }, // epic
   { reward_type: "box", reward_value: 14 }, // legend
@@ -52,7 +51,6 @@ export const openBox = async (_boxId: string): Promise<ServiceBoxOpenResponse> =
     switch (reward.reward_type) {
       case "coins": return 40; // Most common
       case "usdt": return 15;
-      case "ton": return 15;
       case "box": 
         // Rarer boxes have lower probability
         return reward.reward_value === 14 ? 2 : reward.reward_value === 13 ? 5 : 10;

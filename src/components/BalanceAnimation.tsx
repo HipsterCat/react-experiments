@@ -12,6 +12,7 @@ type Coin = {
 export interface BalanceAnimationRef {
   changeBalance: (amount: number, fromCoordinates: { x: number; y: number }) => void;
   getBalanceIconCoordinates: () => { x: number; y: number };
+  setBalanceType: (type: 'coins' | 'usdt') => void;
 }
 
 interface BalanceAnimationProps {
@@ -19,18 +20,21 @@ interface BalanceAnimationProps {
   alwaysVisible?: boolean;
   animationSpeed?: number;
   className?: string;
+  balanceType?: 'coins' | 'usdt';
 }
 
 const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(({
   initialBalance = 200000,
   alwaysVisible = true,
   animationSpeed = 1,
-  className = ""
+  className = "",
+  balanceType: initialBalanceType = 'coins'
 }, ref) => {
   const [balance, setBalance] = useState<number>(initialBalance);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [animatingCoins, setAnimatingCoins] = useState<Coin[]>([]);
   const [balanceVisible, setBalanceVisible] = useState<boolean>(true);
+  const [balanceType, setBalanceType] = useState<'coins' | 'usdt'>(initialBalanceType);
   const HOLD_AFTER_MS = 0; // pause on finished number
   const motionValue = useMotionValue(balance);
   const [displayBalance, setDisplayBalance] = useState<number>(balance);
@@ -67,6 +71,13 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   useEffect(() => {
     setBalanceVisible(alwaysVisible);
   }, [alwaysVisible]);
+
+  // Get the appropriate icon path based on balance type
+  const getIconPath = (): string => {
+    return balanceType === 'usdt' 
+      ? "/src/assets/icon_coin_withdrawable_usd.webp"
+      : "/src/assets/icon_coin.webp";
+  };
 
   // Format number with comma separators
   const formatNumber = (num: number): string => {
@@ -218,7 +229,10 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
     changeBalance,
-    getBalanceIconCoordinates
+    getBalanceIconCoordinates,
+    setBalanceType: (type: 'coins' | 'usdt') => {
+      setBalanceType(type);
+    }
   }));
 
   const digits = getDigits(displayBalance);
@@ -254,7 +268,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
               ease: "easeOut"
             }}
           >
-            <img src="/src/assets/icon_coin.webp" alt="Coin" className="w-full h-full object-contain" />
+            <img src={getIconPath()} alt="Coin" className="w-full h-full object-contain" />
           </motion.div>
         ))}
       </AnimatePresence>
@@ -388,7 +402,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
           } : { scale: 1, x: 0 }}
           transition={{ duration: countingAnimationDuration * animationSpeed, times: [0, 0.15, 0.85, 1], ease: "easeOut" }}
         >
-          <img src="/src/assets/icon_coin.webp" alt="Coin" className="w-full h-full object-contain" />
+          <img src={getIconPath()} alt="Coin" className="w-full h-full object-contain" />
         </motion.div>
       </motion.div>
     </div>

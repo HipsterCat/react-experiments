@@ -6,6 +6,7 @@ import { Button, Text, Title } from "@telegram-apps/telegram-ui";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "../hooks/useTranslation";
+import { useBalanceAnimation } from "../hooks/useBalanceAnimation";
 import boxOpenBg from "../assets/boxes/boxOpenBg_2.jpg";
 import { PrizeCarousel, type WheelSpinState } from "./PrizeCarousel";
 import { ServiceBoxOpenResponse } from "../types/rewards";
@@ -25,6 +26,7 @@ const BoxOpeningModal: React.FC = () => {
   const { isBoxOpeningModalOpen, closeBoxModal, currentBoxId, viewMode, boxContents, switchToWheel, switchView } =
     useBoxOpening();
   const { showSnackbar } = useSnackbar();
+  const { changeBalance, balanceRef } = useBalanceAnimation();
 
   const [showTopupConfetti, setShowTopupConfetti] = useState(false);
   const [wheelSpinState, setWheelSpinState] = useState<WheelSpinState>("IDLE");
@@ -88,12 +90,29 @@ const BoxOpeningModal: React.FC = () => {
     }
   }, [hasSpun, wheelSpinState, viewMode, actualReward]);
 
-  // Trigger confetti if we land on result with a box after a real spin
+  // Trigger effects when we reach result view after spinning
   useEffect(() => {
-    if (hasSpun && viewMode === 'result' && actualReward?.reward_type === "box") {
-      handleTopupSuccess();
+    if (hasSpun && viewMode === 'result' && actualReward) {
+      // Trigger confetti for box rewards
+      if (actualReward.reward_type === "box") {
+        handleTopupSuccess();
+      }
+      
+      // Trigger balance animation for coins or usdt rewards
+      if (actualReward.reward_type === 'coins' || actualReward.reward_type === 'usdt') {
+        // Set the appropriate balance type
+        if (balanceRef.current) {
+          balanceRef.current.setBalanceType(actualReward.reward_type as 'coins' | 'usdt');
+        }
+        
+        const rewardCoordinates = { 
+          x: window.innerWidth / 2, 
+          y: window.innerHeight / 2 
+        };
+        changeBalance(actualReward.reward_value, rewardCoordinates);
+      }
     }
-  }, [viewMode, actualReward, hasSpun]);
+  }, [viewMode, actualReward, hasSpun, changeBalance]);
 
 
 
