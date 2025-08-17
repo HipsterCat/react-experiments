@@ -4,19 +4,22 @@ import BalanceAnimation from './components/BalanceAnimation'
 import { AppRoot } from '@telegram-apps/telegram-ui'
 import { BoxOpeningProvider } from './hooks/useBoxOpening'
 import { BalanceAnimationProvider, useBalanceAnimation } from './hooks/useBalanceAnimation'
+import { NiceToastProvider } from './components/NiceToastProvider'
 
 function App() {
   return (
     <AppRoot>
-      <BalanceAnimationProvider>
-        <BoxOpeningProvider>
-          <BoxOpeningDemo />
-          <BoxOpeningModal />
-          
-          {/* Balance Animation - positioned above all modals */}
-          <BalanceAnimationLayer />
-        </BoxOpeningProvider>
-      </BalanceAnimationProvider>
+      <NiceToastProvider>
+        <BalanceAnimationProvider>
+          <BoxOpeningProvider>
+            <BoxOpeningDemo />
+            <BoxOpeningModal />
+            
+            {/* Balance Animation - positioned above all modals */}
+            <BalanceAnimationLayer />
+          </BoxOpeningProvider>
+        </BalanceAnimationProvider>
+      </NiceToastProvider>
     </AppRoot>
   )
 }

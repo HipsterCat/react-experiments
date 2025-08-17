@@ -2,24 +2,48 @@ import React, { useState } from 'react';
 import { Button, Text, Title } from '@telegram-apps/telegram-ui';
 import { useBalanceAnimation } from '../hooks/useBalanceAnimation';
 import { useBoxOpening } from '../hooks/useBoxOpening';
+import { useToast } from './NiceToastProvider';
 import { purchaseBox, type PurchaseBoxResponse } from '../services/mockBoxService';
 
 const BoxOpeningDemo: React.FC = () => {
   const { changeBalance } = useBalanceAnimation();
   const { openBoxModal, loadBoxContents, boxContents } = useBoxOpening();
+  const { showToast } = useToast();
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
   const handlePurchaseBox = async () => {
     // Prevent multiple rapid clicks
     if (isPurchasing) {
-      console.log('Purchase already in progress, ignoring click');
+      showToast({
+        message: 'Purchase already in progress!',
+        type: 'warning',
+        position: 'top',
+        duration: 2000
+      });
       return;
     }
 
     try {
       setIsPurchasing(true);
+      
+      // Show purchasing toast
+      showToast({
+        message: 'Purchasing mystery box...',
+        type: 'info',
+        position: 'top',
+        duration: 2000
+      });
+      
       const purchaseResult: PurchaseBoxResponse = await purchaseBox();
       console.log('Box purchased:', purchaseResult);
+      
+      // Show success toast
+      showToast({
+        message: 'Mystery box purchased successfully! 🎁',
+        type: 'success',
+        position: 'top',
+        duration: 3000
+      });
       
       // Deduct 150 from balance after successful purchase
       const buttonCoordinates = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
@@ -29,6 +53,12 @@ const BoxOpeningDemo: React.FC = () => {
       openBoxModal(purchaseResult.box_id, 'result');
     } catch (error) {
       console.error('Purchase failed:', error);
+      showToast({
+        message: 'Failed to purchase box. Please try again.',
+        type: 'error',
+        position: 'top',
+        duration: 4000
+      });
     } finally {
       setIsPurchasing(false);
     }
@@ -37,21 +67,49 @@ const BoxOpeningDemo: React.FC = () => {
   const handleOpenBox = async () => {
     // Prevent multiple rapid clicks
     if (isOpening || boxContents.isLoading) {
-      console.log('Opening already in progress, ignoring click');
+      showToast({
+        message: 'Box opening already in progress!',
+        type: 'warning',
+        position: 'bottom',
+        duration: 2000
+      });
       return;
     }
 
     try {
       setIsOpening(true);
+      
+      // Show loading toast
+      showToast({
+        message: 'Loading mystery box contents...',
+        type: 'info',
+        position: 'bottom',
+        duration: 2000
+      });
+      
       const boxId = 1; // Demo box ID
       
       // Load box contents first for wheel mode
       await loadBoxContents(boxId);
       
+      // Show ready toast
+      showToast({
+        message: 'Box loaded! Get ready to spin! 🎯',
+        type: 'success',
+        position: 'bottom',
+        duration: 2500
+      });
+      
       // Then open the modal in wheel mode
       openBoxModal(boxId, 'wheel');
     } catch (error) {
       console.error('Failed to open box:', error);
+      showToast({
+        message: 'Failed to load box contents. Please try again.',
+        type: 'error',
+        position: 'bottom',
+        duration: 4000
+      });
     } finally {
       setIsOpening(false);
     }
@@ -103,8 +161,73 @@ const BoxOpeningDemo: React.FC = () => {
         >
           {(isOpening || boxContents.isLoading) ? '🎯 Loading Box...' : '🎯 Open Mystery Box (Wheel)'}
         </Button>
-        
+
+        {/* Toast Demo Section */}
         <div className="mt-8 p-4 bg-gray-100 rounded-lg">
+          <Text className="text-gray-800 text-sm font-semibold mb-3">
+            🍞 Toast Notifications Demo:
+          </Text>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => showToast({
+                message: 'Success from top! 🎉',
+                type: 'success',
+                position: 'top',
+                duration: 3000
+              })}
+              className="text-xs"
+            >
+              Success Top
+            </Button>
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => showToast({
+                message: 'Error from bottom! ❌',
+                type: 'error',
+                position: 'bottom',
+                duration: 3000
+              })}
+              className="text-xs"
+            >
+              Error Bottom
+            </Button>
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => showToast({
+                message: 'Warning message! ⚠️',
+                type: 'warning',
+                position: 'top',
+                duration: 4000
+              })}
+              className="text-xs"
+            >
+              Warning
+            </Button>
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => showToast({
+                message: 'Custom toast with coin icon',
+                type: 'custom',
+                position: 'bottom',
+                duration: 5000,
+                icon: '/src/assets/icon_coin.webp',
+                backgroundColor: '#8b5cf6',
+                textColor: '#ffffff',
+                borderColor: '#7c3aed'
+              })}
+              className="text-xs"
+            >
+              Custom
+            </Button>
+          </div>
+        </div>
+        
+        <div className="mt-4 p-4 bg-gray-100 rounded-lg">
           <Text className="text-gray-600 text-sm">
             This is a demo of the complete box experience: purchase → acquisition screen → opening animation with randomized rewards!
           </Text>
