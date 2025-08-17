@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { motion, AnimatePresence, useMotionValue, animate, type AnimationPlaybackControls } from 'framer-motion';
+import RollingDigit from './RollingDigit';
+import NumberFlow from '@number-flow/react';
 
 type Coin = {
   id: number;
@@ -23,6 +25,8 @@ interface BalanceAnimationProps {
   animationSpeed?: number;
   className?: string;
   balanceType?: 'coins' | 'usdt';
+  useRollingCounter?: boolean;
+  useNumberFlow?: boolean;
 }
 
 const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(({ 
@@ -31,7 +35,9 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   alwaysVisible = true,
   animationSpeed = 1,
   className = "",
-  balanceType: initialBalanceType = 'coins'
+  balanceType: initialBalanceType = 'coins',
+  useRollingCounter = false,
+  useNumberFlow = true,
 }, ref) => {
   // Determine the correct initial balance based on balance type
   // (no longer used directly once we introduced per-type persistent balances)
@@ -267,6 +273,23 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
 
   const digits = getDigits(displayBalance);
   const isCredit = (deltaSignRef.current !== 0 ? deltaSignRef.current : directionRef.current) > 0;
+  // Map each rendered character to its numeric place value for per-digit rolling
+  const digitsStr = digits.join('');
+  const rawNumericStr = digitsStr.replace(/[^0-9]/g, '');
+  const places: Array<number | null> = [];
+  {
+    let numericIndex = 0;
+    for (let i = 0; i < digits.length; i++) {
+      const ch = digits[i];
+      if (/\d/.test(ch)) {
+        const power = rawNumericStr.length - numericIndex - 1;
+        places[i] = Math.pow(10, power);
+        numericIndex++;
+      } else {
+        places[i] = null;
+      }
+    }
+  }
   
   // During animation, find which digits should be colored
   const shouldColorDigit = (index: number): boolean => {
@@ -343,28 +366,16 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
           
           <div className="flex items-center">
             <div className="flex items-center text-base font-bold leading-5 whitespace-nowrap">
-                {(() => {
-              const result = [];
-              let i = 0;
-              
-              while (i < digits.length) {
-                const shouldColor = shouldColorDigit(i);
-                
-                if (shouldColor) {
-                  // Find the end of this highlighted group
-                  let groupEnd = i;
-                  while (groupEnd < digits.length - 1 && shouldColorDigit(groupEnd + 1)) {
-                    groupEnd++;
-                  }
+              {(() => {
+                // NumberFlow option - smooth rolling with selective highlighting
+                if (useNumberFlow) {
+                  const formattedValue = formatNumber(Math.round(displayBalance));
+                  const shouldHighlight = isAnimating && diffStartIndex >= 0;
                   
-                  // Render the highlighted group with scaling
-                  const groupDigits = digits.slice(i, groupEnd + 1);
-                  result.push(
-                    <motion.span
-                      key={`highlighted-group-${animId}-${i}`}
-                      className="inline-flex origin-left tabular-nums"
-                      style={{ color: '#1f2937', fontSize: '1rem' }}
-                      animate={isAnimating ? {
+                  return (
+                    <motion.div
+                      className="inline-flex tabular-nums"
+                      animate={shouldHighlight ? {
                         fontSize: ['1rem', '1rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1rem'],
                         color: [
                           '#1f2937',
@@ -373,47 +384,117 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
                           isCredit ? '#22c55e' : '#f97316',
                           isCredit ? '#22c55e' : '#f97316',
                           isCredit ? '#22c55e' : '#f97316',
-                          isCredit ? '#22c55e' : '#f97316',
                           '#1f2937'
                         ],
-                        marginBottom: ['0px', '1px', '1px', '1px', '1px', '1px', '1px', '0px', '0px']
-                      } : { fontSize: '1rem' }}
+                        marginBottom: ['0px', '1px', '1px', '1px', '1px', '1px', '0px']
+                      } : { fontSize: '1rem', color: '#1f2937' }}
                       transition={{
                         duration: countingAnimationDuration * animationSpeed,
-                        ease: "easeOut"
+                        ease: 'easeOut'
                       }}
                     >
-                      {groupDigits.map((groupDigit, groupIndex) => (
-                        <span
-                          key={`group-${i + groupIndex}-${groupDigit}`}
-                          className={`inline-block`}
-                        >
-                          {groupDigit}
-                        </span>
-                      ))}
-                    </motion.span>
+                      <NumberFlow
+                        value={Math.round(displayBalance)}
+                        format={{ 
+                          notation: 'standard',
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0,
+                          useGrouping: true
+                        }}
+                        style={{
+                          fontSize: 'inherit',
+                          fontWeight: 'inherit',
+                          color: 'inherit',
+                          fontVariantNumeric: 'tabular-nums',
+                          lineHeight: 'inherit'
+                        }}
+                        transformTiming={{
+                          duration: countingAnimationDuration * animationSpeed * 1000,
+                          easing: 'cubic-bezier(0.4, 0, 0.2, 1)'
+                        }}
+                        spinTiming={{
+                          duration: countingAnimationDuration * animationSpeed * 1000,
+                          easing: 'cubic-bezier(0.4, 0, 0.2, 1)'
+                        }}
+                        trend={deltaSignRef.current !== 0 ? deltaSignRef.current : directionRef.current}
+                      />
+                    </motion.div>
                   );
-                  
-                  // Skip to after this group
-                  i = groupEnd + 1;
-                } else {
-                  // Render non-highlighted digit normally
-                  result.push(
-                    <span
-                      key={`static-${animId}-${i}`}
-                      className={`inline-block transition-colors duration-200 text-gray-800`}
-                    >
-                      {digits[i]}
-                    </span>
-                  );
-                  i++;
                 }
-              }
-              
-                  return result;
-                })()}
+                
+                const result = [];
+                let i = 0;
+                while (i < digits.length) {
+                  const shouldColor = shouldColorDigit(i);
+                  if (shouldColor) {
+                    let groupEnd = i;
+                    while (groupEnd < digits.length - 1 && shouldColorDigit(groupEnd + 1)) {
+                      groupEnd++;
+                    }
+                    const groupDigits = digits.slice(i, groupEnd + 1);
+                    result.push(
+                      <motion.span
+                        key={`highlighted-group-${animId}-${i}`}
+                        className="inline-flex origin-left tabular-nums"
+                        style={{ color: '#1f2937', fontSize: '1rem' }}
+                        animate={isAnimating ? {
+                          fontSize: ['1rem', '1rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1.4rem', '1rem'],
+                          color: [
+                            '#1f2937',
+                            '#1f2937',
+                            isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
+                            '#1f2937'
+                          ],
+                          marginBottom: ['0px', '1px', '1px', '1px', '1px', '1px', '0px']
+                        } : { fontSize: '1rem' }}
+                        transition={{
+                          duration: countingAnimationDuration * animationSpeed,
+                          ease: 'easeOut'
+                        }}
+                      >
+                        {groupDigits.map((groupDigit, groupIndex) => {
+                          const idx = i + groupIndex;
+                          const place = places[idx];
+                          const isNumeric = /\d/.test(groupDigit);
+                          if (useRollingCounter && isNumeric && place) {
+                            return (
+                              <RollingDigit
+                                key={`rolling-${idx}`}
+                                place={place}
+                                value={Math.round(displayBalance)}
+                                height={20}
+                                trend={(deltaSignRef.current !== 0 ? deltaSignRef.current : directionRef.current) as -1 | 0 | 1}
+                              />
+                            );
+                          }
+                          return (
+                            <span key={`group-${idx}-${groupDigit}`} className={`inline-block`}>
+                              {groupDigit}
+                            </span>
+                          );
+                        })}
+                      </motion.span>
+                    );
+                    i = groupEnd + 1;
+                  } else {
+                    result.push(
+                      <span
+                        key={`static-${animId}-${i}`}
+                        className={`inline-block transition-colors duration-200 text-gray-800`}
+                      >
+                        {digits[i]}
+                      </span>
+                    );
+                    i++;
+                  }
+                }
+                return result;
+              })()}
             </div>
-            </div>
+          </div>
           </div>
         </div>
         

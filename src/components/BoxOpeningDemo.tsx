@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button, Text, Title } from '@telegram-apps/telegram-ui';
 import { useBalanceAnimation } from '../hooks/useBalanceAnimation';
 import { useBoxOpening } from '../hooks/useBoxOpening';
 import { useToast } from './NiceToastProvider';
 import { toastHelpers } from '../utils/toast';
 import { purchaseBox, type PurchaseBoxResponse } from '../services/mockBoxService';
+import DemoToast, { DemoToastRef, DynamicIslandSize } from '../components/DemoToast';
+import { ToastType } from '../types/toast';
 
 const BoxOpeningDemo: React.FC = () => {
   const { changeBalance } = useBalanceAnimation();
@@ -12,6 +14,10 @@ const BoxOpeningDemo: React.FC = () => {
   const { showToast, clearAllToasts } = useToast();
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
+  
+  // Demo toast refs
+  const demoToastTopRef = useRef<DemoToastRef>(null);
+  const demoToastBottomRef = useRef<DemoToastRef>(null);
   const handlePurchaseBox = async () => {
     // Prevent multiple rapid clicks
     if (isPurchasing) {
@@ -119,8 +125,8 @@ const BoxOpeningDemo: React.FC = () => {
   return (
     <>
       {/* Main Demo UI */}
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
-      <div className="text-center space-y-6 max-w-md">
+    <div className="min-h-screen bg-white p-4 overflow-y-auto">
+      <div className="max-w-md mx-auto text-center space-y-6 py-8">
         <Title className="text-black text-4xl font-bold mb-10" style={{ marginBottom: 10 }}>
           🎁 Box Opening Demo
         </Title>
@@ -344,6 +350,85 @@ const BoxOpeningDemo: React.FC = () => {
           </div>
         </div>
         
+        {/* Demo Toast Section */}
+        <div className="mt-8 p-4 bg-gray-900 rounded-lg">
+          <Text className="text-white text-sm font-semibold mb-3">
+            🚀 Dynamic Island Toast (Single Container):
+          </Text>
+          
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => demoToastTopRef.current?.showToast({
+                message: 'Compact Toast',
+                type: 'success',
+                duration: 4000,
+                size: 'compact',
+              })}
+              className="text-xs"
+            >
+              Show Compact
+            </Button>
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => demoToastBottomRef.current?.showToast({
+                message: 'This is a much longer toast message',
+                type: 'info',
+                duration: 5000,
+                size: 'long',
+              })}
+              className="text-xs"
+            >
+              Show Long
+            </Button>
+          </div>
+
+          <Text className="text-white text-sm font-semibold mb-2">
+            Test Dynamic Sizing & Morphing:
+          </Text>
+          <div className="grid grid-cols-1 gap-2 mb-4">
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => {
+                const sequence: { message: string, type: ToastType, size: DynamicIslandSize }[] = [
+                  { message: 'Connecting...', type: 'loading', size: 'compact' },
+                  { message: 'Authentication successful!', type: 'success', size: 'long' },
+                  { message: 'Welcome back, Sasha!', type: 'info', size: 'long' },
+                  { message: '', type: 'info', size: 'collapsed' },
+                ];
+                
+                let delay = 0;
+                sequence.forEach((item, index) => {
+                  setTimeout(() => {
+                    demoToastTopRef.current?.showToast({ ...item, duration: 3000 });
+                  }, delay);
+                  delay += index === sequence.length - 2 ? 3000 : 2000;
+                });
+              }}
+              className="text-xs"
+            >
+              Run Full Sequence
+            </Button>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => {
+                demoToastTopRef.current?.hideToast();
+                demoToastBottomRef.current?.hideToast();
+              }}
+              className="text-xs flex-1"
+            >
+              Hide All
+            </Button>
+          </div>
+        </div>
+        
         <div className="mt-4 p-4 bg-gray-100 rounded-lg">
           <Text className="text-gray-600 text-sm">
             This is a demo of the complete box experience: purchase → acquisition screen → opening animation with randomized rewards!
@@ -351,6 +436,10 @@ const BoxOpeningDemo: React.FC = () => {
         </div>
       </div>
     </div>
+
+      {/* Demo Toast Components */}
+      <DemoToast ref={demoToastTopRef} position="top" />
+      <DemoToast ref={demoToastBottomRef} position="bottom" />
 
       {/* BoxOpeningModal is rendered once globally in App.tsx */}
     </>

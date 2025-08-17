@@ -23,16 +23,30 @@ const getViewportOffset = () => {
 export const NiceToastProvider = ({ children }: NiceToastProviderProps) => {
   const [toasts, setToasts] = useState<ToastType[]>([]);
   const toastTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const toastDeadlines = useRef<Map<string, number>>(new Map());
+  const visibleByKey = useRef<Map<string, string>>(new Map());
   const toastCounter = useRef(1);
   const hideToastRef = useRef<(id: string) => void>();
+  // Keep a live reference to the latest toasts array to avoid side-effects
+  // inside state updaters and stale closures in timer callbacks
+  const toastsRef = useRef<ToastType[]>([]);
 
   // Clean up removed toasts periodically
   useEffect(() => {
     const cleanup = setInterval(() => {
-      setToasts(prev => prev.filter(t => !t.removed || Date.now() - t.createdAt < 10000));
+      const now = Date.now();
+      setToasts(prev => {
+        const filtered = prev.filter(t => !t.removed || now - t.createdAt < 10000);
+        if (filtered.length === prev.length) return prev;
+        // Sync ref to avoid stale snapshot
+        toastsRef.current = filtered;
+        return filtered;
+      });
     }, 5000);
     return () => clearInterval(cleanup);
   }, []);
+
+  const makeKey = useCallback((variantId: string, position: 'top' | 'bottom') => `${variantId}::${position}`, []);
 
   const clearToastTimer = useCallback((id: string) => {
     const timer = toastTimers.current.get(id);
@@ -40,6 +54,7 @@ export const NiceToastProvider = ({ children }: NiceToastProviderProps) => {
       clearTimeout(timer);
       toastTimers.current.delete(id);
     }
+    toastDeadlines.current.delete(id);
   }, []);
 
   const startToastTimer = useCallback((toast: ToastType) => {
@@ -50,22 +65,48 @@ export const NiceToastProvider = ({ children }: NiceToastProviderProps) => {
     if (existing) clearTimeout(existing);
 
     console.log(`[ToastProvider] Starting timer for toast ${toast.id}, duration: ${toast.remainingTime}ms`);
-
+    const expectedStartAt = toast.timerStartAt;
+    const expectedUpdateCount = toast.updateCount;
+    const expectedDeadline = Date.now() + toast.remainingTime;
+    toastDeadlines.current.set(toast.id, expectedDeadline);
+    console.log(`[ToastProvider] Timer metadata for ${toast.id}`, { expectedStartAt, expectedUpdateCount, expectedDeadline });
     const timer = setTimeout(() => {
       console.log(`[ToastProvider] Timer expired for toast ${toast.id}`);
-      // Get fresh toast state
-      setToasts(prev => {
-        const currentToast = prev.find(t => t.id === toast.id);
-        if (currentToast && currentToast.visible && !currentToast.removed) {
-          currentToast.onAutoClose?.();
-          // Call hideToast
-          if (hideToastRef.current) {
-            console.log(`[ToastProvider] Calling hideToast for ${toast.id}`);
-            hideToastRef.current(toast.id);
-          }
-        }
-        return prev;
-      });
+      // Use the latest toasts snapshot to decide, then perform side-effect directly
+      const currentToast = toastsRef.current.find(t => t.id === toast.id);
+      if (!currentToast) {
+        toastTimers.current.delete(toast.id);
+        return;
+      }
+      const currentDeadline = toastDeadlines.current.get(toast.id);
+      // Guard against stale timers from older states
+      const isStale = (expectedStartAt !== null && currentToast.timerStartAt !== expectedStartAt)
+        || currentToast.updateCount !== expectedUpdateCount
+        || !currentToast.visible
+        || currentToast.removed
+        || currentDeadline !== expectedDeadline;
+      if (isStale) {
+        console.log(`[ToastProvider] Ignoring stale timer for ${toast.id}`, {
+          expectedStartAt,
+          actualStartAt: currentToast.timerStartAt,
+          expectedUpdateCount,
+          actualUpdateCount: currentToast.updateCount,
+          expectedDeadline,
+          actualDeadline: currentDeadline,
+          visible: currentToast.visible,
+          removed: currentToast.removed,
+        });
+        toastTimers.current.delete(toast.id);
+        return;
+      }
+      currentToast.onAutoClose?.();
+      if (hideToastRef.current) {
+        console.log(`[ToastProvider] Calling hideToast for ${toast.id}`);
+        hideToastRef.current(toast.id);
+      }
+      // Ensure timer is cleared from the map on expiry
+      toastTimers.current.delete(toast.id);
+      toastDeadlines.current.delete(toast.id);
     }, toast.remainingTime);
 
     toastTimers.current.set(toast.id, timer);
@@ -168,6 +209,7 @@ export const NiceToastProvider = ({ children }: NiceToastProviderProps) => {
     // Clear all timers
     toastTimers.current.forEach(timer => clearTimeout(timer));
     toastTimers.current.clear();
+    toastDeadlines.current.clear();
     
     // Mark all as removed
     setToasts(prev => prev.map(toast => ({ ...toast, removed: true })));
@@ -178,19 +220,18 @@ export const NiceToastProvider = ({ children }: NiceToastProviderProps) => {
     }, TOAST_CONFIG.TIME_BEFORE_UNMOUNT);
   }, []);
 
-  // Handle document visibility for pausing timers
+  // Handle document visibility for pausing timers (attach once, read from ref)
   useEffect(() => {
     const handleVisibilityChange = () => {
+      const snapshot = toastsRef.current;
       if (document.hidden) {
-        // Pause all visible toasts with remaining time
-        toasts.forEach(toast => {
+        snapshot.forEach(toast => {
           if (toast.visible && toast.duration && toast.duration > 0 && !toast.pausedAt && toast.remainingTime > 0) {
             pauseToast(toast.id);
           }
         });
       } else {
-        // Resume all visible toasts with remaining time
-        toasts.forEach(toast => {
+        snapshot.forEach(toast => {
           if (toast.visible && toast.pausedAt && toast.remainingTime > 0) {
             resumeToast(toast.id);
           }
@@ -200,13 +241,18 @@ export const NiceToastProvider = ({ children }: NiceToastProviderProps) => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [toasts, pauseToast, resumeToast]);
+  }, [pauseToast, resumeToast]);
 
-  // Set hideToast ref to avoid circular dependencies
+  // Set hideToast ref once (functions are stable due to useCallback)
   useEffect(() => {
     console.log(`[ToastProvider] Setting hideToastRef`);
     hideToastRef.current = hideToast;
-  });
+  }, []);
+
+  // Keep toastsRef in sync with state
+  useEffect(() => {
+    toastsRef.current = toasts;
+  }, [toasts]);
 
   const showToast = useCallback((toastInput: ToastInput): string => {
     const variantId = generateVariantId(toastInput);
@@ -215,46 +261,56 @@ export const NiceToastProvider = ({ children }: NiceToastProviderProps) => {
 
     console.log(`[ToastProvider] showToast called:`, { variantId, position, defaultDuration, type: toastInput.type });
 
-    // Check if there's already a visible toast with same variantId
-    const existingVisible = toasts.find(t => 
-      t.variantId === variantId && t.position === position && t.visible && !t.removed
-    );
+    // Check the latest snapshot for an existing visible toast with same variantId
+    const key = makeKey(variantId, position);
+    let existingId = visibleByKey.current.get(key);
+    // Validate the id still points to a visible toast
+    let existingVisible = existingId ? toastsRef.current.find(t => t.id === existingId && t.visible && !t.removed) : undefined;
+    if (!existingVisible) {
+      existingVisible = toastsRef.current.find(t => t.variantId === variantId && t.position === position && t.visible && !t.removed);
+      if (existingVisible) visibleByKey.current.set(key, existingVisible.id);
+    }
 
     if (existingVisible) {
       console.log(`[ToastProvider] Updating existing toast ${existingVisible.id}`);
-      
-      // Update existing toast
-      setToasts(prev => prev.map(t => {
-        if (t.id === existingVisible.id) {
-          clearToastTimer(t.id);
-          const now = Date.now();
-          const updated = {
-            ...t,
-            ...toastInput,
-            id: t.id, // Keep the same ID
-            variantId: t.variantId, // Keep the same variantId
-            position: t.position, // Keep the same position
-            updateCount: t.updateCount + 1,
-            remainingTime: defaultDuration,
-            timerStartAt: defaultDuration > 0 ? now : null,
-            pausedAt: null,
-          };
-          
-          // Restart timer after state update
-          if (defaultDuration > 0) {
-            setTimeout(() => startToastTimer(updated), 0);
+      // Clear any running timer before updating
+      clearToastTimer(existingVisible.id);
+
+      let updatedToast: ToastType | null = null;
+      setToasts(prev => {
+        const next = prev.map(t => {
+          if (t.id === existingVisible.id) {
+            const now = Date.now();
+            const updated = {
+              ...t,
+              ...toastInput,
+              id: t.id,
+              variantId: t.variantId,
+              position: t.position,
+              updateCount: t.updateCount + 1,
+              remainingTime: defaultDuration,
+              timerStartAt: defaultDuration > 0 ? now : null,
+              pausedAt: null,
+            } as ToastType;
+            updatedToast = updated;
+            return updated;
           }
-          
-          return updated;
-        }
-        return t;
-      }));
-      
+          return t;
+        });
+        // Keep ref in sync so rapid calls see the latest state
+        toastsRef.current = next;
+        return next;
+      });
+
+      if (defaultDuration > 0 && updatedToast) {
+        setTimeout(() => startToastTimer(updatedToast as ToastType), 0);
+      }
+
       return existingVisible.id;
     }
 
-    // Determine if there is a currently visible toast at this position
-    const currentVisible = toasts.find(t => t.position === position && t.visible && !t.removed);
+    // Determine current visible toast at this position from latest snapshot
+    const currentVisible = toastsRef.current.find(t => t.position === position && t.visible && !t.removed);
 
     const id = `toast-${toastCounter.current++}`;
     const now = Date.now();
@@ -281,10 +337,8 @@ export const NiceToastProvider = ({ children }: NiceToastProviderProps) => {
     console.log(`[ToastProvider] Creating new toast:`, { id, remainingTime: newToast.remainingTime, currentVisible: currentVisible?.id });
 
     setToasts(prev => {
-      // Hide current visible toast at this position (pause and make invisible)
       const updated = prev.map(t => {
         if (currentVisible && t.id === currentVisible.id) {
-          // Pause it and mark invisible
           const now = Date.now();
           let remainingTime = t.remainingTime;
           if (t.timerStartAt) {
@@ -303,18 +357,20 @@ export const NiceToastProvider = ({ children }: NiceToastProviderProps) => {
         }
         return t;
       });
-
-      return [...updated, newToast];
+      const next = [...updated, newToast];
+      // Maintain fast lookup for visible by variant+position
+      visibleByKey.current.set(key, newToast.id);
+      // Keep ref in sync so rapid calls see the latest state
+      toastsRef.current = next;
+      return next;
     });
 
-    // Start timer for new toast if needed
     if (newToast.remainingTime > 0) {
-      const timerToast = { ...newToast, id };
-      setTimeout(() => startToastTimer(timerToast), 0);
+      setTimeout(() => startToastTimer(newToast), 0);
     }
 
     return id;
-  }, [clearToastTimer, startToastTimer, toasts]);
+  }, [clearToastTimer, startToastTimer]);
 
   const contextValue: ToastContextType = {
     toasts,
