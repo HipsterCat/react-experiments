@@ -7,6 +7,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { RewardTypeImage } from "./RewardTypeImage";
 import { BottomSentinelSafeArea } from "./BottomSentinelSafeArea";
 import { useBoxOpening } from "../hooks/useBoxOpening";
+import starIcon from "../assets/boxes/star.webp";
 
 interface LootBoxFullScreenProps {
   boxId: number;
@@ -80,6 +81,26 @@ export const LootBoxFullScreen: FC<LootBoxFullScreenProps> = ({
                   className="relative mt-[21px]"
                   style={{ width: 154, height: 154 }}
                 >
+                  {/* Rotating Star Animation */}
+                  <div 
+                    className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                    style={{ 
+                      width: '600px',
+                      height: '600px',
+                      zIndex: -1
+                    }}
+                  >
+                    <img 
+                      src={starIcon} 
+                      alt="" 
+                      className="w-full h-full animate-spin"
+                      style={{
+                        animation: 'spin 20s linear infinite',
+                        opacity: 0.6
+                      }}
+                    />
+                  </div>
+                  
                   <RewardTypeImage
                     reward={{
                       reward_type: "box",
