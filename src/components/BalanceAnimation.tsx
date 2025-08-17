@@ -361,8 +361,9 @@ const BalanceCounter = () => {
             </div>
           </div>
           
-          {/* Blue Dollar Icon - Positioned absolutely on top */}
+          {/* Dollar Icon - Positioned absolutely on top */}
           <motion.div 
+            key={`icon-${animId}`}
             ref={balanceIconRef}
             className="absolute w-4 h-4 flex items-center justify-center z-30 pointer-events-none"
             style={{
