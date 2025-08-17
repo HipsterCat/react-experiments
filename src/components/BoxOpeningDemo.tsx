@@ -3,7 +3,7 @@ import { Button, Text, Title } from '@telegram-apps/telegram-ui';
 import { useBalanceAnimation } from '../hooks/useBalanceAnimation';
 import { useBoxOpening } from '../hooks/useBoxOpening';
 import { useToast } from './NiceToastProvider';
-import { toast, toastHelpers } from '../utils/toast';
+import { toastHelpers } from '../utils/toast';
 import { purchaseBox, type PurchaseBoxResponse } from '../services/mockBoxService';
 
 const BoxOpeningDemo: React.FC = () => {
@@ -335,7 +335,6 @@ const BoxOpeningDemo: React.FC = () => {
               mode="outline"
               onClick={() => {
                 // Clear all toasts
-                const { clearAllToasts } = useToast();
                 clearAllToasts();
               }}
               className="text-xs flex-1"

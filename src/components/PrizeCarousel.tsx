@@ -51,10 +51,14 @@ export const PrizeCarousel = ({
 
   const intervalRef = useRef<number>();
   const animationRef = useRef<number>();
+  const animateFnRef = useRef<(() => void) | null>(null);
 
   const spinStartTimeRef = useRef<number>();
   const lastScrollTimeRef = useRef<number>();
   const hasSpunRef = useRef<boolean>(false);
+  const spinDurationRef = useRef<number>(0);
+  const pausedSinceRef = useRef<number | null>(null);
+  const totalPausedMsRef = useRef<number>(0);
 
   // Debug logging
   useEffect(() => {
@@ -139,16 +143,19 @@ export const PrizeCarousel = ({
       console.log("Current Index:", emblaApi.selectedScrollSnap());
 
       spinStartTimeRef.current = Date.now();
+      totalPausedMsRef.current = 0;
+      pausedSinceRef.current = null;
       lastScrollTimeRef.current = Date.now() - 100; // Start with a gap so first scroll happens immediately
 
       const spinDuration = 4000 + Math.random() * 1000; // 4-5 seconds
+      spinDurationRef.current = spinDuration;
 
       let scrollCount = 0;
       let lastLogTime = Date.now();
 
       const animate = () => {
         const now = Date.now();
-        const totalElapsed = now - (spinStartTimeRef.current || 0);
+        const totalElapsed = now - (spinStartTimeRef.current || 0) - (totalPausedMsRef.current || 0);
         const timeSinceLastScroll = now - (lastScrollTimeRef.current || 0);
 
         // Calculate progress with smooth easing
@@ -213,11 +220,49 @@ export const PrizeCarousel = ({
         }
       };
 
+      animateFnRef.current = animate;
       animationRef.current = requestAnimationFrame(animate);
     }
 
     return clear;
   }, [emblaApi, wheelSpinState, setSpinState, prizes, onFinalReward, items.length]);
+
+  // Pause/resume scrolling and spinning based on page visibility
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!emblaApi) return;
+      if (document.hidden) {
+        // Pause any ongoing animations/intervals
+        if (animationRef.current) cancelAnimationFrame(animationRef.current);
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        if (wheelSpinState === 'SPINNING') {
+          pausedSinceRef.current = Date.now();
+        }
+      } else {
+        // Resume depending on state
+        if (wheelSpinState === 'SPINNING') {
+          if (pausedSinceRef.current) {
+            totalPausedMsRef.current += Date.now() - pausedSinceRef.current;
+            pausedSinceRef.current = null;
+          }
+          if (animateFnRef.current) {
+            animationRef.current = requestAnimationFrame(animateFnRef.current);
+          }
+        } else if (wheelSpinState === 'IDLE') {
+          // Restart idle gentle scroll
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          intervalRef.current = window.setInterval(() => {
+            emblaApi.scrollPrev();
+          }, 2000);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [emblaApi, wheelSpinState]);
 
   return (
     <div className="embla absolute inset-0 flex items-center justify-center overflow-hidden">

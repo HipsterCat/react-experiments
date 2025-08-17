@@ -2,8 +2,35 @@ import React from 'react';
 import { ToastInput, AnimationCoordinates } from '../types/toast';
 import InventoryToast from '../components/InventoryToast';
 
-// Re-export the basic toast methods from context
-export { toast } from '../components/NiceToastProvider';
+// Toast helper that must be used within components
+let toastInstance: any = null;
+
+export const setToastInstance = (instance: any) => {
+  toastInstance = instance;
+};
+
+export const toast = {
+  success: (message: string, options?: Partial<ToastInput>) => {
+    if (!toastInstance) throw new Error('Toast not initialized. Wrap your app with NiceToastProvider');
+    return toastInstance.success(message, options);
+  },
+  error: (message: string, options?: Partial<ToastInput>) => {
+    if (!toastInstance) throw new Error('Toast not initialized. Wrap your app with NiceToastProvider');
+    return toastInstance.error(message, options);
+  },
+  warning: (message: string, options?: Partial<ToastInput>) => {
+    if (!toastInstance) throw new Error('Toast not initialized. Wrap your app with NiceToastProvider');
+    return toastInstance.warning(message, options);
+  },
+  info: (message: string, options?: Partial<ToastInput>) => {
+    if (!toastInstance) throw new Error('Toast not initialized. Wrap your app with NiceToastProvider');
+    return toastInstance.info(message, options);
+  },
+  loading: (message: string, options?: Partial<ToastInput>) => {
+    if (!toastInstance) throw new Error('Toast not initialized. Wrap your app with NiceToastProvider');
+    return toastInstance.loading(message, options);
+  },
+};
 
 // Specialized toast creators
 export const toastHelpers = {

@@ -36,6 +36,8 @@ export interface Toast extends ToastInput {
   variantId: string;
   createdAt: number;
   pausedAt: number | null;
+  // Timestamp when the current running timer started; used to compute elapsed time precisely
+  timerStartAt: number | null;
   remainingTime: number;
   height: number;
   mounted: boolean;
@@ -45,6 +47,8 @@ export interface Toast extends ToastInput {
   swipeDirection: SwipeDirection | null;
   // For attention/duplicate detection
   updateCount: number;
+  // Whether this toast is currently presented (visible). Invisible toasts are paused and not rendered
+  visible?: boolean;
 }
 
 export interface ToastContextType {
@@ -67,13 +71,16 @@ export interface InventoryUpdateToast extends ToastInput {
 
 // Toast configuration constants
 export const TOAST_CONFIG = {
-  VISIBLE_TOASTS: 3,
   VIEWPORT_OFFSET: 16, // Mobile-first
   TOAST_LIFETIME: 4000,
-  TOAST_WIDTH: 350,
-  GAP: 14,
+  TOAST_WIDTH: 340,
   SWIPE_THRESHOLD: 45,
-  TIME_BEFORE_UNMOUNT: 200,
+  TIME_BEFORE_UNMOUNT: 300,
   ANIMATION_DURATION: 400,
-  LIFT_AMOUNT: 1,
+  // Dynamic Island style dimensions/animation
+  DI_INITIAL_SIZE: 56,
+  DI_ICON_SIZE: 24,
+  DI_EXPAND_MS: 380,
+  DI_COLLAPSE_MS: 280,
+  DI_TEXT_FADE_MS: 200,
 } as const;
