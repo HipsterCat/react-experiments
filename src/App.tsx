@@ -1,9 +1,9 @@
-import BalanceAnimation from './components/BalanceAnimation'
+import BalanceAnimationPage from './components/BalanceAnimationPage'
 
 function App() {
   return (
     <div className="App">
-      <BalanceAnimation />
+      <BalanceAnimationPage />
     </div>
   )
 }
