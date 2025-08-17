@@ -1,6 +1,6 @@
-import type { InventoryReward } from "../api/generated";
+import type { InventoryReward } from "../types/rewards";
 import clsx from "clsx";
-import { useTranslation } from "react-i18next";
+import { useTranslation } from "../hooks/useTranslation";
 
 export function RewardTypeBadge({
   reward,

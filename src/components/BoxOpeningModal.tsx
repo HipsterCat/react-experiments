@@ -1,28 +1,21 @@
-import { useAppDispatch } from "../hooks";
-import { ClosableModal } from "../ui/components/ClosableModal";
-import { BottomSentinelSafeArea } from "../components/AppContent/BottomSentinel";
+import { fetchProfile, fetchTasks, useBoxOpening, useSnackbar } from "../hooks/useBoxOpening";
+import { ClosableModal } from "./ClosableModal";
 import { RewardTypeImage } from "./RewardTypeImage";
 import { ConfettiParticles } from "./particles/ConfettiParticles";
 import { Button, Text, Title } from "@telegram-apps/telegram-ui";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useTranslation } from "../hooks/useTranslation";
 import boxOpenBg from "../assets/boxes/boxOpenBg_2.jpg";
 import { PrizeCarousel, type WheelSpinState } from "./PrizeCarousel";
-import { InventoryReward, ServiceBoxOpenResponse } from "@/api/generated";
+import { ServiceBoxOpenResponse, PrizeItem } from "../types/rewards";
+import { getBoxContents, openBox } from "../services/mockBoxService";
+import { BottomSentinelSafeArea } from "./BottomSentinelSafeArea";
 import downIcon from "../assets/down.png";
 import Confetti from "react-confetti";
+import { useAppDispatch } from "../hooks/useBoxOpening";
 
-interface PrizeItem {
-  reward_type:
-    | "coins"
-    | "usdt"
-    | "ton"
-    | "telegram_premium"
-    | "double_balance"
-    | "box";
-  reward_value: number;
-}
+
 
 const BoxOpeningModal: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -49,8 +42,10 @@ const BoxOpeningModal: React.FC = () => {
   };
 
   useEffect(() => {
-    if (currentBoxId) {
+    if (currentBoxId !== undefined) {
+      console.log('useEffect', currentBoxId);
       setActualReward(null);
+      console.log('useEffect setWheelSpinState IDLE');
       setWheelSpinState("IDLE");
       setRewardLoading(false);
       loadPrizes();
@@ -59,16 +54,17 @@ const BoxOpeningModal: React.FC = () => {
 
   useEffect(() => {
     if (actualReward?.reward_type === "box" && wheelSpinState === "STOPPED") {
+      console.log('useEffect IF ACTUAL REWARD', actualReward, wheelSpinState);
       handleTopupSuccess();
     }
   }, [actualReward, wheelSpinState]);
 
   const loadPrizes = async () => {
-    if (!currentBoxId) return;
+    if (currentBoxId === undefined) return;
 
     try {
       setIsLoading(true);
-      const { data } = await apiGenerated.inventoryDetail(String(currentBoxId));
+      const data = await getBoxContents(String(currentBoxId));
 
       const filteredRewards = data.rewards.filter(
         (reward) =>
@@ -96,17 +92,18 @@ const BoxOpeningModal: React.FC = () => {
 
   const startSpinning = async () => {
     try {
-      if (!currentBoxId || isRewardLoading) return;
+      if (currentBoxId === undefined || isRewardLoading) return;
 
       setRewardLoading(true);
 
-      const { data } = await apiGenerated.inventoryOpenCreate(
-        String(currentBoxId)
-      );
+      console.log('startSpinning, openBox', currentBoxId);
+      const data = await openBox(String(currentBoxId));
 
       setActualReward(data);
+      console.log('startSpinning setWheelSpinState SPINNING', data);
       setWheelSpinState("SPINNING");
       setRewardLoading(false);
+
     } catch (error) {
       console.error(error);
       showSnackbar(t("profilePage.dailyModal.error"), { type: "error" });
@@ -117,13 +114,15 @@ const BoxOpeningModal: React.FC = () => {
   const handleContinue = () => {
     closeBoxModal();
     dispatch(fetchTasks());
-    dispatch(fetchProfile());
+    dispatch(fetchProfile()); 
   };
 
   const handleOpenNow = () => {
     if (actualReward) {
+      console.log('handleOpenNow', actualReward);
       const match = actualReward.extra?.match(/:(\d+)/);
       if (match) {
+        console.log('handleOpenNow', match[1]);
         openBoxModal(Number(match[1]));
       }
     } else {
@@ -341,7 +340,7 @@ const BoxOpeningModal: React.FC = () => {
                       loading={isRewardLoading}
                     >
                       <div className="flex gap-2 mx-2">
-                        <img src={downIcon} style={{ height: 20 }} />
+                      <img src={downIcon} style={{ height: 20 }} />
                         <Text
                           className="text-gray-900"
                           weight="2"

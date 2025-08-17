@@ -1,4 +1,4 @@
-import type { InventoryReward } from "../api/generated";
+import type { InventoryReward } from "../types/rewards";
 import { RewardTypeImage } from "./RewardTypeImage";
 import { findPrizeIndex } from "../utils/findPrizeIndex";
 import useEmblaCarousel from "embla-carousel-react";
@@ -166,16 +166,7 @@ export const PrizeCarousel = ({
             return (
               <div
                 key={`${prize.reward_type}-${prize.reward_value}-${index}`}
-                className={`
-                    relative
-                    ${isCenter ? "scale-120 z-20" : ""}
-                    ${isAdjacent ? "opacity-70 z-10" : ""}
-                    ${isFar ? "opacity-50 scale-90 z-0" : ""}
-                    py-10
-                    will-change-transform
-                    will-change-opacity
-                    box-content
-                  `}
+                className={`relative ${isCenter ? "scale-120 z-20" : ""} ${isAdjacent ? "opacity-70 z-10" : ""} ${isFar ? "opacity-50 scale-90 z-0" : ""} py-10    will-change-transform will-change-opacity box-content`}
                 style={{ width: 165, height: 165 }}
               >
                 <RewardTypeImage

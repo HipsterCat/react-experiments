@@ -1,4 +1,4 @@
-import type { InventoryReward } from "../api/generated";
+import type { InventoryReward } from "../types/rewards";
 
 interface FindPrizeIndexParams {
   prizes: InventoryReward[];

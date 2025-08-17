@@ -1,0 +1,37 @@
+.tg-ui-modal-fix {
+    overflow: hidden;
+  }
+  
+  .tg-ui-modal-fix > header {
+    z-index: 1;
+  
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    background-color: transparent !important;
+    border-radius: inherit;
+  
+    overflow: hidden;
+  }
+  
+  .tg-ui-modal-fix > header::before {
+    display: none;
+  }
+  
+  /* Override the modal overlay background */
+  [vaul-overlay] {
+    background: var(--tgui--overlay_bg_color) !important;
+  }
+  
+  /* For dark theme compatibility */
+  div[vaul-overlay] {
+    background: rgba(0, 0, 0, 0.4) !important;
+  }
+  
+  /* iOS caret visibility fix */
+  .tg-ui-modal-fix__ios {
+    position: absolute !important;
+    transform: none !important;
+  }
+  

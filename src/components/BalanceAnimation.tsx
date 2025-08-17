@@ -185,7 +185,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
       if (!alwaysVisible) {
         hideTimerRef.current = window.setTimeout(() => {
           setBalanceVisible(false);
-        }, 2000);
+        }, 3000);
       }
     }, ((animatedCoinsDuration * animationSpeed) + maxDelay) * 1000 + HOLD_AFTER_MS);
   };
@@ -231,7 +231,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   };
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative ${className}`} style={{ zIndex: 12_000 }}>
       {/* Animated Coins */}
       <AnimatePresence>
         {animatingCoins.map((coin) => (

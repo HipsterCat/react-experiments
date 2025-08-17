@@ -1,10 +1,153 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "@telegram-apps/telegram-ui/dist/styles.css";
+@import "tailwindcss";
 
+@theme {
+  --spacing-safe-area-inset-bottom: max(var(--tg-safe-area-inset-bottom), 16px);
 
-@layer base {
-  html {
-    font-family: -apple-system-rounded, "Arial Rounded MT", ui-rounded, system-ui, sans-serif !important;
+  --spacing-tg-safe-area-inset-bottom: var(--tg-safe-area-inset-bottom);
+
+  --color-text: var(--tg-theme-text-color);
+  --color-link: var(--tg-theme-link-color);
+  --color-hint: var(--tg-theme-hint-color);
+  --color-background: var(--tg-theme-bg-color);
+  --color-border: rgba(0, 0, 0, 0.15);
+  --color-button: var(--tg-theme-button-color);
+  --color-secondary-bg-color: var(--tg-theme-secondary-bg-color);
+  --color-section-bg-color: var(--tg-theme-section-bg-color);
+  --color-section-header-text-color: var(--tg-theme-section-header-text-color);
+  --color-destructive-text-color: var(--tg-theme-destructive-text-color);
+  --color-secondary-fill: var(--tgui--secondary_fill);
+
+  --color-tgui-bg: var(--tgui--bg_color);
+  --color-tgui-secondary-bg: var(--tgui--secondary_bg_color);
+  --color-tgui-section-bg: var(--tgui--section_bg_color);
+  --color-tgui-surface-primary: var(--tgui--surface_primary);
+  --color-tgui-text: var(--tgui--text_color);
+
+  --font-headline: -apple-system-headline, BlinkMacSystemFont, sans-serif;
+
+  --shadow-top-divider: 0 calc(var(--retina-separator-width, 1px) * -1) 0 var(--tgui--divider);
+
+  --shadow-card: 0 5px 6px 0 rgba(0, 0, 0, .06), 0 0 2px 1px rgba(0, 0, 0, .02);
+
+  --breakpoint-media-360: 320px;
+}
+
+@utility bg-tgui-surface-primary {
+  background-color: var(--tgui--surface_primary);
+}
+
+@utility text-tgui-secondary-hint {
+  color: var(--tgui--secondary_hint_color);
+}
+
+@utility text-tgui-link {
+  color: var(--tgui--link_color);
+}
+
+@utility border-tgui-divider {
+  border-color: var(--tgui--divider);
+}
+
+:root {
+  --retina-separator-width: 1px;
+
+  --tabbar-height: 56px;
+}
+
+@media (min-resolution: 2dppx) {
+  :root {
+    --retina-separator-width: 0.5px;
   }
+}
+
+@media (min-resolution: 3dppx) {
+  :root {
+    --retina-separator-width: 0.33px;
+  }
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+*::-webkit-scrollbar {
+  display: none;
+}
+
+html {
+  overflow: hidden;
+  overscroll-behavior: none;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--tg-theme-secondary-bg-color);
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+img {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.container {
+  --container-padding: 16px;
+  --floating-profile-area-height: calc(
+    var(--floating-profile-height, 0) +
+    var(--floating-profile-bottom, 10px)
+  );
+  --container-padding-top: calc(var(--container-padding) + var(--tg-safe-area-inset-top, 0px));
+  --container-padding-bottom: calc(
+    var(--container-bottom-padding, var(--container-padding)) +
+    var(--floating-profile-area-height, 0) +
+    var(--tg-safe-area-inset-bottom, 0px)
+  );
+  --container-padding-left: calc(var(--container-padding) + var(--tg-safe-area-inset-left, 0px));
+  --container-padding-right: calc(var(--container-padding) + var(--tg-safe-area-inset-right, 0px));
+
+  padding: var(--container-padding-top) var(--container-padding-right)
+    var(--container-padding-bottom) var(--container-padding-left);
+
+  min-height: calc(100dvh - var(--tabbar-current-height, 0px));
+  max-height: calc(100dvh - var(--tabbar-current-height, 0px));
+  height: auto;
+  overflow-y: scroll;
+  overflow-x: hidden;
+
+  box-sizing: border-box;
+
+  background-color: var(--tgui--bg_color);
+}
+
+.text-rounded {
+  font-family: -apple-system-rounded, "Arial Rounded MT", ui-rounded, system-ui, sans-serif !important;
+}
+
+/* fix for rect shape hover in telegram ui buttons */
+button[class^="tgui"]::after {
+  border-radius: inherit;
+}
+
+#tc-widget-root {
+  pointer-events: initial;
 }
