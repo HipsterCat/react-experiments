@@ -17,6 +17,8 @@ export interface BalanceAnimationRef {
 
 interface BalanceAnimationProps {
   initialBalance?: number;
+  initialCoinsBalance?: number;
+  initialUsdtBalance?: number;
   alwaysVisible?: boolean;
   animationSpeed?: number;
   className?: string;
@@ -25,12 +27,24 @@ interface BalanceAnimationProps {
 
 const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(({
   initialBalance = 200000,
+  initialCoinsBalance = 2255,
+  initialUsdtBalance = 0,
   alwaysVisible = true,
   animationSpeed = 1,
   className = "",
   balanceType: initialBalanceType = 'coins'
 }, ref) => {
-  const [balance, setBalance] = useState<number>(initialBalance);
+  // Determine the correct initial balance based on balance type
+  const getInitialBalance = () => {
+    if (initialBalance !== 200000) {
+      // If initialBalance is explicitly set, use it (for backward compatibility)
+      return initialBalance;
+    }
+    // Otherwise use the specific balance for the type
+    return initialBalanceType === 'coins' ? initialCoinsBalance : initialUsdtBalance;
+  };
+
+  const [balance, setBalance] = useState<number>(getInitialBalance());
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [animatingCoins, setAnimatingCoins] = useState<Coin[]>([]);
   const [balanceVisible, setBalanceVisible] = useState<boolean>(true);
@@ -134,7 +148,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
 
     // Accumulate new target based on current ultimate target, not last committed balance
     const currentDisplay = Math.round(motionValue.get());
-    const newTarget = (isAnimating ? targetRef.current : balance) + amount;
+    const newTarget = Math.max(0, (isAnimating ? targetRef.current : balance) + amount);
     targetRef.current = newTarget;
 
     // Bump animation id to restart highlight/scale timeline
@@ -232,6 +246,12 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
     getBalanceIconCoordinates,
     setBalanceType: (type: 'coins' | 'usdt') => {
       setBalanceType(type);
+      // Reset balance to appropriate initial value when switching types
+      const newBalance = type === 'coins' ? initialCoinsBalance : initialUsdtBalance;
+      setBalance(newBalance);
+      setDisplayBalance(newBalance);
+      motionValue.set(newBalance);
+      targetRef.current = newBalance;
     }
   }));
 

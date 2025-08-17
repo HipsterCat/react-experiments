@@ -3,8 +3,9 @@ import type { BalanceAnimationRef } from '../components/BalanceAnimation';
 
 interface BalanceAnimationContextType {
   balanceRef: React.RefObject<BalanceAnimationRef>;
-  changeBalance: (amount: number, fromCoordinates: { x: number; y: number }) => void;
+  changeBalance: (amount: number, fromCoordinates: { x: number; y: number }, balanceType?: 'coins' | 'usdt') => void;
   getBalanceIconCoordinates: () => { x: number; y: number };
+  setBalanceType: (type: 'coins' | 'usdt') => void;
 }
 
 const BalanceAnimationContext = createContext<BalanceAnimationContextType | undefined>(undefined);
@@ -12,9 +13,12 @@ const BalanceAnimationContext = createContext<BalanceAnimationContextType | unde
 export const BalanceAnimationProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const balanceRef = useRef<BalanceAnimationRef>(null);
 
-  const changeBalance = (amount: number, fromCoordinates: { x: number; y: number }) => {
+  const changeBalance = (amount: number, fromCoordinates: { x: number; y: number }, balanceType: 'coins' | 'usdt' = 'coins') => {
     if (balanceRef.current) {
       try {
+        // Switch to the specified balance type if different from current
+        balanceRef.current.setBalanceType(balanceType);
+        // Then change the balance
         balanceRef.current.changeBalance(amount, fromCoordinates);
       } catch (error) {
         console.error('Balance animation error:', error);
@@ -29,10 +33,21 @@ export const BalanceAnimationProvider: FC<{ children: ReactNode }> = ({ children
     return { x: 0, y: 0 };
   };
 
+  const setBalanceType = (type: 'coins' | 'usdt') => {
+    if (balanceRef.current) {
+      try {
+        balanceRef.current.setBalanceType(type);
+      } catch (error) {
+        console.error('Balance type change error:', error);
+      }
+    }
+  };
+
   const value = {
     balanceRef,
     changeBalance,
     getBalanceIconCoordinates,
+    setBalanceType,
   };
 
   return (

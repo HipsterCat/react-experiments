@@ -181,7 +181,7 @@ const BoxOpeningModal: React.FC = () => {
       setIsSwitchingToWheel(true);
       
       // If opening a box, trigger reveal animation
-      if (isBox && actualReward) {
+      if (isBox) {
         setShowRevealAnimation(true);
         // Wait a bit for the animation to start before switching
         await new Promise(resolve => setTimeout(resolve, 800));
@@ -289,7 +289,7 @@ const BoxOpeningModal: React.FC = () => {
                 prizes={boxContents.prizes}
                 wheelSpinState={wheelSpinState}
                 setSpinState={setWheelSpinState}
-                actualReward={actualReward}
+                actualReward={displayReward}
                 showRevealAnimation={showRevealAnimation}
                 onRevealComplete={() => setShowRevealAnimation(false)}
                 onFinalReward={(reward) => {
@@ -338,7 +338,7 @@ const BoxOpeningModal: React.FC = () => {
                           zIndex: -1,
                           transform: (isBoxOpeningModalOpen) ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.8)',
                           opacity: (isBoxOpeningModalOpen) ? 0.6 : 0,
-                          transition: 'all 800ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                          transition: 'all 400ms cubic-bezier(0.34, 1.56, 0.64, 1)',
                           transitionDelay: (isBoxOpeningModalOpen) ? '400ms' : '0ms'
                         }}
                       >

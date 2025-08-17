@@ -31,12 +31,16 @@ export const PrizeCarousel = ({
   onRevealComplete,
   onFinalReward,
 }: PrizeCarouselProps) => {
+  // Use a fallback list so we can display a single reward (like a box)
+  // in result mode before the real prizes are loaded.
+  const items = prizes.length > 0 ? prizes : (actualReward ? [actualReward] : []);
+
   const [emblaRef, emblaApi] = useEmblaCarousel({
     axis: "y",
     loop: true,
     dragFree: false,
     align: "center",
-    startIndex: Math.floor(prizes.length / 2),
+    startIndex: Math.floor(items.length / 2),
     watchDrag: false,
     skipSnaps: false,
     containScroll: false,
@@ -138,7 +142,7 @@ export const PrizeCarousel = ({
 
         // Debug logging every 500ms
         if (now - lastLogTime > 500) {
-          console.log(`[SPIN DEBUG] Elapsed: ${totalElapsed}ms/${spinDuration}ms, Progress: ${(progress * 100).toFixed(1)}%, EasedProgress: ${(easedProgress * 100).toFixed(1)}%, CurrentDelay: ${currentDelay.toFixed(1)}ms, ScrollCount: ${scrollCount}, CurrentIndex: ${emblaApi.selectedScrollSnap()}, PrizeLength: ${prizes.length}`);
+          console.log(`[SPIN DEBUG] Elapsed: ${totalElapsed}ms/${spinDuration}ms, Progress: ${(progress * 100).toFixed(1)}%, EasedProgress: ${(easedProgress * 100).toFixed(1)}%, CurrentDelay: ${currentDelay.toFixed(1)}ms, ScrollCount: ${scrollCount}, CurrentIndex: ${emblaApi.selectedScrollSnap()}, PrizeLength: ${items.length}`);
           lastLogTime = now;
         }
 
@@ -187,7 +191,7 @@ export const PrizeCarousel = ({
     }
 
     return clear;
-  }, [emblaApi, wheelSpinState, setSpinState, prizes, onFinalReward]);
+  }, [emblaApi, wheelSpinState, setSpinState, prizes, onFinalReward, items.length]);
 
   return (
     <div className="embla absolute inset-0 flex items-center justify-center overflow-hidden">
@@ -226,8 +230,8 @@ export const PrizeCarousel = ({
       
       <div className="embla__viewport" ref={emblaRef}>
         <div className="embla__container">
-          {prizes.map((prize, index) => {
-            const distance = getDistance(index, selectedIndex, prizes.length);
+          {items.map((prize, index) => {
+            const distance = getDistance(index, selectedIndex, items.length);
             const isCenter = distance === 0;
             const isSelected = index === selectedIndex;
             
@@ -257,9 +261,11 @@ export const PrizeCarousel = ({
               });
             }
             
-            // Use revealed reward for selected item during reveal animation
-            const displayPrize = (showRevealAnimation && isSelected && actualReward) 
-              ? actualReward 
+            // Show the provided actualReward for the selected item when either:
+            // - we're revealing, or
+            // - we're in STOPPED state (e.g., result view placeholder)
+            const displayPrize = (isSelected && actualReward && (showRevealAnimation || wheelSpinState === 'STOPPED'))
+              ? actualReward
               : prize;
 
             return (

@@ -29,7 +29,8 @@ function BalanceAnimationLayer() {
     <div className="fixed top-4 left-4 z-[99999] pointer-events-none">
       <BalanceAnimation
         ref={balanceRef}
-        initialBalance={1000}
+        initialCoinsBalance={2255}
+        initialUsdtBalance={0}
         alwaysVisible={false}
         animationSpeed={1}
       />
