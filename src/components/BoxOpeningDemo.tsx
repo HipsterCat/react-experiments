@@ -23,7 +23,7 @@ const BoxOpeningDemo: React.FC = () => {
       
       // Deduct 150 from balance after successful purchase
       const buttonCoordinates = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-      changeBalance(-150, buttonCoordinates);
+      changeBalance(-150, buttonCoordinates, 'coins');
       
       // Open the box modal in 'result' mode to show "you've got" screen
       openBoxModal(purchaseResult.box_id, 'result');

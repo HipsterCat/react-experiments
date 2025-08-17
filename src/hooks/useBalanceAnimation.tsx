@@ -13,12 +13,14 @@ const BalanceAnimationContext = createContext<BalanceAnimationContextType | unde
 export const BalanceAnimationProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const balanceRef = useRef<BalanceAnimationRef>(null);
 
-  const changeBalance = (amount: number, fromCoordinates: { x: number; y: number }, balanceType: 'coins' | 'usdt' = 'coins') => {
+  const changeBalance = (amount: number, fromCoordinates: { x: number; y: number }, balanceType?: 'coins' | 'usdt') => {
     if (balanceRef.current) {
       try {
-        console.log('changeBalance', amount, fromCoordinates, balanceType);
-        // Switch to the specified balance type if different from current
-        balanceRef.current.setBalanceType(balanceType);
+        console.log('changeBalance', amount, fromCoordinates, balanceType ?? '(unchanged)');
+        // Switch to the specified balance type if provided
+        if (balanceType) {
+          balanceRef.current.setBalanceType(balanceType);
+        }
         // Then change the balance
         balanceRef.current.changeBalance(amount, fromCoordinates);
       } catch (error) {

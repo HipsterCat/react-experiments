@@ -38,7 +38,7 @@ export const PrizeCarousel = ({
   const [emblaRef, emblaApi] = useEmblaCarousel({
     axis: "y",
     loop: true,
-    dragFree: false,
+    dragFree: true,
     align: "center",
     startIndex: 0,
     watchDrag: false,
@@ -125,8 +125,8 @@ export const PrizeCarousel = ({
 
     if (wheelSpinState === "IDLE") {
       intervalRef.current = window.setInterval(() => {
-        emblaApi.scrollNext();
-      }, 2500);
+        emblaApi.scrollPrev();
+      }, 2000);
 
       return clear;
     }
@@ -171,7 +171,7 @@ export const PrizeCarousel = ({
 
         if (timeSinceLastScroll >= currentDelay) {
           const beforeIndex = emblaApi.selectedScrollSnap();
-          emblaApi.scrollNext();
+          emblaApi.scrollPrev();
           scrollCount++;
           lastScrollTimeRef.current = now;
           
@@ -184,7 +184,7 @@ export const PrizeCarousel = ({
         }
 
         // Continue until time is up AND we have minimum scrolls
-        const minScrolls = 40;
+        const minScrolls = 35;
         if (totalElapsed < spinDuration || scrollCount < minScrolls) {
           animationRef.current = requestAnimationFrame(animate);
         } else {
@@ -202,6 +202,7 @@ export const PrizeCarousel = ({
             try {
               onFinalReward(prizes[finalIndex]);
               setSelectedIndex(finalIndex);
+              console.log("onFinalReward", prizes[finalIndex], "finalIndex", finalIndex);
 
             } catch (e) {
               console.warn("onFinalReward callback failed:", e);
@@ -239,7 +240,6 @@ export const PrizeCarousel = ({
             flex-direction: column;
             will-change: transform;
             will-change: opacity;
-            padding-bottom: 40px;
           }
           .embla__slide {
             transform: translate3d(0, 0, 0);
@@ -248,8 +248,6 @@ export const PrizeCarousel = ({
             display: flex;
             align-items: center;
             justify-content: center;
-            padding-top: var(--slide-spacing);
-            padding-bottom: var(--slide-spacing);
           }
         `}
       </style>
@@ -283,6 +281,17 @@ export const PrizeCarousel = ({
                                 wheelSpinState === "IDLE" && distance > 1 ? 0.8 :
                                 wheelSpinState === "IDLE" && distance === 0 ? 1.0 :
                                 wheelSpinState === "STOPPED" && !isCenter ? 0 : 1;
+
+            // Rotation logic for IDLE state:
+            // - Items before the centered item: -5deg
+            // - Items after the centered item: +5deg
+            // - Centered item: 0deg
+            const relativePosition = (index - normalizedSelectedIndex + items.length) % items.length;
+            const isBefore = distance !== 0 && relativePosition > items.length / 2;
+            const isAfter = distance !== 0 && !isBefore;
+            const rotationValue = wheelSpinState === "IDLE"
+              ? ((isCenter || isSelected) ? 0 : (isAfter ? 7 : -7))
+              : 0;
             
             // Debug logging for visibility issues
             if (wheelSpinState === "STOPPED" && isSelected) {
@@ -298,6 +307,9 @@ export const PrizeCarousel = ({
               });
             }
             
+            if (scaleValue === 1.0 && opacityValue === 1.0) {
+              console.log("Selected key", `${prize.reward_type}-${prize.reward_value}-${index}`, "isSelected", isSelected, "actualReward", actualReward, "showRevealAnimation", showRevealAnimation, "wheelSpinState", wheelSpinState, "scaleValue", scaleValue, "opacityValue", opacityValue);
+            }
             // Show the provided actualReward for the selected item when either:
             // - we're revealing, or
             // - we're in STOPPED state (e.g., result view placeholder)
@@ -311,19 +323,22 @@ export const PrizeCarousel = ({
                   <motion.div
                     className="relative will-change-transform will-change-opacity"
                     initial={false}
-                    style={{ height: "100%", transformOrigin: "center center" }}
+                    style={{ height: "100%", aspectRatio: "1/1", transformOrigin: "center center" }}
                     animate={{
                       scale: scaleValue,
                       opacity: opacityValue,
+                      rotate: rotationValue,
                     }}
                     transition={{ 
-                      duration: 0.4, 
-                      ease: [0.34, 1.56, 0.64, 1]
+                      type: 'spring',
+                      stiffness: 220,
+                      damping: 24,
+                      mass: 1.5,
                     }}
                   >
                     <RewardTypeImage
                       reward={displayPrize}
-                      className="w-full h-full"
+                      className="w-full h-full aspect-square"
                       badgeSize={wheelSpinState === 'SPINNING' ? undefined : (wheelSpinState === 'STOPPED' && (isCenter || isSelected)) ? 'm' : 's'}
                       wheelSpinState={wheelSpinState}
                       onLoaded={isRevealSelected ? () => setSelectedLoaded(true) : undefined}

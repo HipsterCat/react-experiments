@@ -27,7 +27,7 @@ const BoxOpeningModal: React.FC = () => {
   const { isBoxOpeningModalOpen, closeBoxModal, currentBoxId, viewMode, boxContents, switchView, loadBoxContents } =
     useBoxOpening();
   const { showSnackbar } = useSnackbar();
-  const { changeBalance, balanceRef } = useBalanceAnimation();
+  const { changeBalance } = useBalanceAnimation();
 
   const [showTopupConfetti, setShowTopupConfetti] = useState(false);
   const [wheelSpinState, setWheelSpinState] = useState<WheelSpinState>("IDLE");
@@ -44,7 +44,7 @@ const BoxOpeningModal: React.FC = () => {
     setShowTopupConfetti(true);
     setTimeout(() => {
       setShowTopupConfetti(false);
-    }, 6000);
+    }, 600);
   };
 
   useEffect(() => {
@@ -126,6 +126,7 @@ const BoxOpeningModal: React.FC = () => {
     if (!isBoxOpeningModalOpen) return;
     if (hasAppliedRewardRef.current) return;
     if (hasSpun && viewMode === 'result' && displayReward) {
+      console.log('hasSpun and viewMode is result -> trigger confetti');
       // Trigger confetti for box rewards
       if (displayReward?.reward_type === "box") {
         handleTopupSuccess();
@@ -133,16 +134,16 @@ const BoxOpeningModal: React.FC = () => {
       
       // Trigger balance animation for coins or usdt rewards
       if (displayReward.reward_type === 'coins' || displayReward.reward_type === 'usdt') {
-        // Set the appropriate balance type
-        if (balanceRef.current) {
-          balanceRef.current.setBalanceType(displayReward.reward_type as 'coins' | 'usdt');
-        }
-        
         const rewardCoordinates = { 
           x: window.innerWidth / 2, 
           y: window.innerHeight / 2 
         };
-        changeBalance(displayReward.reward_value, rewardCoordinates);
+        // Pass the type explicitly so the animation switches context atomically
+        changeBalance(
+          displayReward.reward_value,
+          rewardCoordinates,
+          displayReward.reward_type as 'coins' | 'usdt'
+        );
         hasAppliedRewardRef.current = true;
       }
     }
@@ -302,10 +303,10 @@ const BoxOpeningModal: React.FC = () => {
             {/* Wheel layer (kept mounted). Only show/hide, no scaling */}
             <motion.div
               className="absolute inset-0"
-              initial={{ opacity: 0, y: -60, scale: 1.3 }}
+              initial={{ opacity: 0, y: -50, scale: 1.3 }}
               animate={{
                 opacity: 1,
-                y: viewMode === 'result' ? -40 : 0,
+                y: viewMode === 'result' ? -30 : 0,
                 scale: 1,
               }}
               transition={{ duration: 0.4, ease: "easeInOut" }}
@@ -320,6 +321,9 @@ const BoxOpeningModal: React.FC = () => {
                 showRevealAnimation={showRevealAnimation}
                 onRevealComplete={() => {
                   setShowRevealAnimation(false);
+                  console.log('onRevealComplete setShowRevealAnimation false, setHasSpun false, setWheelSpinState IDLE');
+                  // Prepare wheel state before switching to avoid immediate flip back to result
+
                   // Switch to wheel exactly when reveal completes to avoid empty gap
                   if (viewMode === 'result' && currentBoxId !== undefined) {
                     switchView('wheel');
@@ -332,15 +336,14 @@ const BoxOpeningModal: React.FC = () => {
               />
             </motion.div>
 
-            {/* Result layer */}
-            {displayReward && (
+
               <motion.div
                 className="absolute inset-0 flex items-center justify-center"
                 initial={{ opacity: 0, scale: 0.5, y: 50 }}
                 animate={{
                   opacity: viewMode === 'result' ? 1 : 0,
                   scale: viewMode === 'result' ? 1 : 0.5,
-                  y: viewMode === 'result' ? -40 : 0,
+                  y: viewMode === 'result' ? -30 : 0,
                 }}
                 transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
                 style={{ pointerEvents: viewMode === 'result' ? 'auto' : 'none', zIndex: -1 }}
@@ -387,7 +390,7 @@ const BoxOpeningModal: React.FC = () => {
                     )}
                 </div>
               </motion.div>
-            )}
+            
 
 
           </>

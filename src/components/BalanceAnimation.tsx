@@ -25,8 +25,7 @@ interface BalanceAnimationProps {
   balanceType?: 'coins' | 'usdt';
 }
 
-const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(({
-  initialBalance = 200000,
+const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(({ 
   initialCoinsBalance = 2255,
   initialUsdtBalance = 0,
   alwaysVisible = true,
@@ -35,14 +34,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   balanceType: initialBalanceType = 'coins'
 }, ref) => {
   // Determine the correct initial balance based on balance type
-  const getInitialBalance = () => {
-    if (initialBalance !== 200000) {
-      // If initialBalance is explicitly set, use it (for backward compatibility)
-      return initialBalance;
-    }
-    // Otherwise use the specific balance for the type
-    return initialBalanceType === 'coins' ? initialCoinsBalance : initialUsdtBalance;
-  };
+  // (no longer used directly once we introduced per-type persistent balances)
 
   // Persistent balances for both types
   const [coinsBalance, setCoinsBalance] = useState<number>(initialCoinsBalance);
@@ -51,7 +43,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   
   // Current balance based on type
   const balance = balanceType === 'coins' ? coinsBalance : usdtBalance;
-  const setBalance = balanceType === 'coins' ? setCoinsBalance : setUsdtBalance;
+  // Note: do not alias setter to avoid "unused" issues; update specific setter explicitly on complete
   
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [animatingCoins, setAnimatingCoins] = useState<Coin[]>([]);
