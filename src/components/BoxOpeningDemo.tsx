@@ -6,7 +6,7 @@ import { purchaseBox, type PurchaseBoxResponse } from '../services/mockBoxServic
 
 const BoxOpeningDemo: React.FC = () => {
   const { changeBalance } = useBalanceAnimation();
-  const { openBoxModal } = useBoxOpening();
+  const { openBoxModal, loadBoxContents, boxContents } = useBoxOpening();
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
   const handlePurchaseBox = async () => {
@@ -34,8 +34,27 @@ const BoxOpeningDemo: React.FC = () => {
     }
   };
 
-  const handleOpenBox = () => {
-    openBoxModal(1, 'wheel');
+  const handleOpenBox = async () => {
+    // Prevent multiple rapid clicks
+    if (isOpening || boxContents.isLoading) {
+      console.log('Opening already in progress, ignoring click');
+      return;
+    }
+
+    try {
+      setIsOpening(true);
+      const boxId = 1; // Demo box ID
+      
+      // Load box contents first for wheel mode
+      await loadBoxContents(boxId);
+      
+      // Then open the modal in wheel mode
+      openBoxModal(boxId, 'wheel');
+    } catch (error) {
+      console.error('Failed to open box:', error);
+    } finally {
+      setIsOpening(false);
+    }
   };
 
   return (
@@ -72,7 +91,7 @@ const BoxOpeningDemo: React.FC = () => {
           size="l"
           mode="filled"
           onClick={handleOpenBox}
-          loading={isOpening}
+          loading={isOpening || boxContents.isLoading}
           className="w-full bg-gradient-to-r from-pink-500 to-violet-500 hover:from-pink-600 hover:to-violet-600 transition-all duration-300 transform hover:scale-105"
           style={{
             borderRadius: 20,
@@ -82,7 +101,7 @@ const BoxOpeningDemo: React.FC = () => {
             marginTop: 30,
           }}
         >
-          {isOpening ? '💳 Opening...' : '💳 Open Mystery Box'}
+          {(isOpening || boxContents.isLoading) ? '🎯 Loading Box...' : '🎯 Open Mystery Box (Wheel)'}
         </Button>
         
         <div className="mt-8 p-4 bg-gray-100 rounded-lg">

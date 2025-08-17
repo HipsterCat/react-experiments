@@ -8,8 +8,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "../hooks/useTranslation";
 import boxOpenBg from "../assets/boxes/boxOpenBg_2.jpg";
 import { PrizeCarousel, type WheelSpinState } from "./PrizeCarousel";
-import { ServiceBoxOpenResponse, PrizeItem } from "../types/rewards";
-import { getBoxContents, openBox } from "../services/mockBoxService";
+import { ServiceBoxOpenResponse } from "../types/rewards";
+import { openBox } from "../services/mockBoxService";
 import { BottomSentinelSafeArea } from "./BottomSentinelSafeArea";
 import downIcon from "../assets/down.png";
 import Confetti from "react-confetti";
@@ -22,13 +22,11 @@ const BoxOpeningModal: React.FC = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { isBoxOpeningModalOpen, closeBoxModal, openBoxModal, currentBoxId, initialDisplayMode } =
+  const { isBoxOpeningModalOpen, closeBoxModal, openBoxModal, currentBoxId, initialDisplayMode, boxContents } =
     useBoxOpening();
   const { showSnackbar } = useSnackbar();
 
   const [showTopupConfetti, setShowTopupConfetti] = useState(false);
-  const [prizes, setPrizes] = useState<PrizeItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [wheelSpinState, setWheelSpinState] = useState<WheelSpinState>("IDLE");
   const [showYouveGot, setShowYouveGot] = useState(false);
 
@@ -63,11 +61,16 @@ const BoxOpeningModal: React.FC = () => {
           reward_value: 0,
         });
       } else {
-        // Normal wheel mode
+        // Normal wheel mode - box contents should already be loaded from context
         console.log('useEffect setWheelSpinState IDLE (wheel mode)');
         setWheelSpinState("IDLE");
         setShowYouveGot(false);
-        loadPrizes();
+        
+        // Check if we have an error loading box contents
+        if (boxContents.error) {
+          showSnackbar(boxContents.error, { type: "error" });
+          closeBoxModal();
+        }
       }
     } else {
       // Reset all state when modal closes
@@ -77,10 +80,8 @@ const BoxOpeningModal: React.FC = () => {
       setShowYouveGot(false);
       setRewardLoading(false);
       setShowTopupConfetti(false);
-      setPrizes([]);
-      setIsLoading(true);
     }
-  }, [currentBoxId, initialDisplayMode]);
+  }, [currentBoxId, initialDisplayMode, boxContents.error]);
 
   useEffect(() => {
     if (actualReward && wheelSpinState === "STOPPED" && initialDisplayMode === 'wheel') {
@@ -102,37 +103,7 @@ const BoxOpeningModal: React.FC = () => {
     }
   }, [initialDisplayMode, showYouveGot, actualReward]);
 
-  const loadPrizes = async () => {
-    if (currentBoxId === undefined) return;
 
-    try {
-      setIsLoading(true);
-      const data = await getBoxContents(String(currentBoxId));
-
-      const filteredRewards = data.rewards.filter(
-        (reward) =>
-          reward.reward_type !== "double_balance" &&
-          reward.reward_type !== "telegram_premium"
-      );
-
-      const mappedPrizes: PrizeItem[] = [
-        ...filteredRewards,
-        ...filteredRewards,
-      ].map((reward) => ({
-        reward_type: reward.reward_type as PrizeItem["reward_type"],
-        reward_value: reward.reward_value,
-      }));
-
-      setPrizes(mappedPrizes);
-    } catch (error) {
-      console.error(error);
-      showSnackbar(t("profilePage.dailyModal.error"), { type: "error" });
-      console.log('loadPrizes closeBoxModal');
-      closeBoxModal();
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const startSpinning = async () => {
     try {
@@ -237,7 +208,7 @@ const BoxOpeningModal: React.FC = () => {
       
       {/* Main Content Area */}
       <div className="flex-1 relative overflow-hidden">
-        {isLoading && !showYouveGot ? (
+        {boxContents.isLoading && !showYouveGot ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
           </div>
@@ -255,7 +226,7 @@ const BoxOpeningModal: React.FC = () => {
                 }}
               >
                 <PrizeCarousel
-                  prizes={prizes}
+                  prizes={boxContents.prizes}
                   wheelSpinState={wheelSpinState}
                   setSpinState={setWheelSpinState}
                   actualReward={actualReward}
@@ -348,7 +319,7 @@ const BoxOpeningModal: React.FC = () => {
       </div>
 
       {/* Footer with buttons */}
-      {!isLoading && !showYouveGot && (
+      {!boxContents.isLoading && !showYouveGot && (
         <div className="relative z-[999] px-4 pb-4">
           <div 
             className="flex flex-col items-center gap-3"
