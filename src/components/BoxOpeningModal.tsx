@@ -296,8 +296,8 @@ const BoxOpeningModal: React.FC = () => {
                     className="relative"
                     style={{ width: isBox ? 154 : 220, height: isBox ? 154 : 220 }}
                   >
-                    {/* Rotating Star Animation for boxes */}
-                    {isBox && (
+                    {/* Rotating Star Animation for result */}
+                    {(
                       <div 
                         className="absolute left-1/2 top-1/2 pointer-events-none"
                         style={{ 
