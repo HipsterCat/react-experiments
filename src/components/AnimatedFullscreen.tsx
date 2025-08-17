@@ -1,7 +1,7 @@
 import React, { useEffect, useState, ReactNode } from 'react';
 import { Icon28Close } from "@telegram-apps/telegram-ui/dist/icons/28/close";
 import { useTabbarContext } from "../hooks/useTabbarContext";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface AnimatedFullscreenProps {
   isOpen: boolean;
@@ -32,6 +32,7 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [displayedBackground, setDisplayedBackground] = useState<string | undefined>(backgroundImage);
   const tabbarContext = useTabbarContext();
 
   // Handle Telegram WebApp back button
@@ -78,9 +79,15 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
     }
   }, [isOpen]);
 
+  // Keep the last non-null/undefined background to avoid flicker during transitional nulls
+  useEffect(() => {
+    if (backgroundImage) {
+      setDisplayedBackground(backgroundImage);
+    }
+  }, [backgroundImage]);
+
   const handleClose = () => {
     console.log('handleClose isanimating false');
-    showOverlay = false;
     setIsAnimating(false);
     setTimeout(() => {
       console.log('handleClose onClose after 300ms');
@@ -101,8 +108,8 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
       const circleSize = isAnimating ? '150%' : '0%';
       return {
         ...baseStyle,
-        background: backgroundImage 
-          ? `radial-gradient(circle at center, ${backgroundColor} ${circleSize}, transparent ${circleSize}), url(${backgroundImage})`
+        background: displayedBackground 
+          ? `radial-gradient(circle at center, ${backgroundColor} ${circleSize}, transparent ${circleSize}), url(${displayedBackground})`
           : `radial-gradient(circle at center, ${backgroundColor} ${circleSize}, transparent ${circleSize})`,
         transition: 'background 600ms cubic-bezier(0.4, 0, 0.2, 1)',
       };
@@ -110,10 +117,12 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
 
     return {
       ...baseStyle,
-      backgroundImage,
+      backgroundImage: displayedBackground,
       backgroundColor,
     };
   };
+
+  const backgroundKey = `${displayedBackground ?? ''}::${backgroundColor ?? ''}`;
 
   const getContainerTransform = () => {
     if (animationType === 'scale') {
@@ -127,14 +136,19 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
   return (
     <div className="fixed inset-0 z-[11000]">
       {/* Background Layer */}
-      <div
-        className="absolute inset-0"
-        style={{
-          ...getBackgroundStyle(),
-          opacity: isAnimating ? 1 : 0,
-          transition: 'opacity 400ms cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-      />
+      <AnimatePresence initial={false}>
+        <motion.div
+          key={backgroundKey}
+          className="absolute inset-0"
+          style={{
+            ...getBackgroundStyle(),
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isAnimating ? 1 : 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.4, ease: 'easeInOut' }}
+        />
+      </AnimatePresence>
       
       {/* Overlay Layer (above background for blend mode) */}
       {overlayImage && (
@@ -149,8 +163,8 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
             mixBlendMode: 'overlay',
           }}
           initial={{ opacity: 0 }}
-          animate={{ opacity: showOverlay ? 1 : 0 }}
-          transition={{ duration: 0.4, ease: "easeInOut" }}
+          animate={{ opacity: showOverlay && isAnimating ? 1 : 0 }}
+          transition={{ duration: isAnimating ? 0.4 : 0.1, ease: "easeInOut" }}
         />
         <motion.div
           className="absolute inset-0"
@@ -159,8 +173,8 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
             mixBlendMode: 'color',
           }}
           initial={{ opacity: 0 }}
-          animate={{ opacity: showOverlay ? 0.8 : 0 }}
-          transition={{ duration: 0.4, ease: "easeInOut" }}
+          animate={{ opacity: showOverlay && isAnimating ? 0.8 : 0 }}
+          transition={{ duration: isAnimating ? 0.4 : 0.1, ease: "easeInOut" }}
         />
         </div>
       )}

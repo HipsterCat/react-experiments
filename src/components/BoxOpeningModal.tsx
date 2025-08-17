@@ -274,16 +274,15 @@ const BoxOpeningModal: React.FC = () => {
       displayReward.reward_value === 11) 
     ) {
       return {
-        backgroundImage: `linear-gradient(rgba(206, 243, 240, 1.0), rgba(189, 211, 226, 1.0)), url(${boxOpenBg})`,
+        backgroundImage: `linear-gradient(rgba(206, 243, 240, 0.9), rgba(189, 211, 226, 0.95)), url(${boxOpenBg})`,
       };
     }
     return {
-      backgroundImage: `linear-gradient(rgba(187, 255, 259, 0.6), rgba(168, 255, 157, 0.5)), url(${boxOpenBg})`,
+      backgroundImage: `linear-gradient(rgba(187, 255, 255, 0.9), rgba(168, 255, 157, 0.9)), url(${boxOpenBg})`,
     };
   };
 
   return (
-      console.log('getBg', getBg()),
         <AnimatedFullscreen
       isOpen={isBoxOpeningModalOpen}
       onClose={closeBoxModal}
