@@ -1,5 +1,5 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion';
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence, useMotionValue, animate, type AnimationPlaybackControls } from 'framer-motion';
 
 type Coin = {
   id: number;
@@ -13,7 +13,6 @@ const BalanceCounter = () => {
   const [balance, setBalance] = useState<number>(200000);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [animatingCoins, setAnimatingCoins] = useState<Coin[]>([]);
-  const [changeAmount, setChangeAmount] = useState<number>(0);
   const [alwaysVisible, setAlwaysVisible] = useState<boolean>(true);
   const [balanceVisible, setBalanceVisible] = useState<boolean>(true);
   const animationSpeed = 1;
@@ -30,16 +29,31 @@ const BalanceCounter = () => {
   ];
 
   const countingAnimationDuration = 1.0;
-  const [animDuration, setAnimDuration] = useState<number>(1);
+  const animatedCoinsDuration = countingAnimationDuration * 1.2;
   const [animId, setAnimId] = useState<number>(0);
+  const animationControlsRef = useRef<AnimationPlaybackControls | null>(null);
+  const animationRunIdRef = useRef<number>(0);
+  const targetRef = useRef<number>(balance);
+  const holdTimerRef = useRef<number | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
+  const coinFinishTimerRef = useRef<number | null>(null);
+  const coinsRunIdRef = useRef<number>(0);
+  const directionRef = useRef<number>(0);
   // Width approximation for digits and commas (tune for your design)
-  const DIGIT_PX = 10;
-  const COMMA_PX = 4;
-  const HIGHLIGHT_SCALE = 1.4;
   
   // Coin animation constraints
   const MAX_X_OFFSET = 30; // Maximum negative X offset for coin arc
   const MAX_Y_OFFSET = 30; // Maximum Y offset from minimum Y position
+
+  // Cleanup timers and animations on unmount
+  useEffect(() => {
+    return () => {
+      animationControlsRef.current?.stop();
+      if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
+      if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+      if (coinFinishTimerRef.current) window.clearTimeout(coinFinishTimerRef.current);
+    };
+  }, []);
 
   // Update balance visibility when toggle changes
   useEffect(() => {
@@ -76,51 +90,65 @@ const BalanceCounter = () => {
   };
 
   const changeBalance = (amount: number, buttonIndex: number) => {
-    if (isAnimating) return; // fix - continue animation if already animating
-    const newBalance = balance + amount;
-    const oldBalance = balance;
-    setAnimId((id) => id + 1);
-    setChangeAmount(amount);
-    
-    // Show balance first if in animation-only mode, then start animating after a brief delay
-    if (!alwaysVisible && !balanceVisible) {
+    // Always ensure visibility during activity
+    if (!balanceVisible) {
       setBalanceVisible(true);
-      // Wait for the appearance animation to complete before starting balance animation
+    }
+
+    // Cancel any pending hide timers; we'll decide to hide when truly idle
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (coinFinishTimerRef.current) {
+      clearTimeout(coinFinishTimerRef.current);
+      coinFinishTimerRef.current = null;
+    }
+
+    // Accumulate new target based on current ultimate target, not last committed balance
+    const currentDisplay = Math.round(motionValue.get());
+    const newTarget = (isAnimating ? targetRef.current : balance) + amount;
+    targetRef.current = newTarget;
+
+    // Bump animation id to restart highlight/scale timeline
+    setAnimId((id) => id + 1);
+    setIsAnimating(true);
+
+    // Recompute differing index against current display so highlight is accurate mid-flight
+    setDiffStartIndex(getFirstDifferingPosition(currentDisplay, newTarget));
+
+    // Spawn additional coins for this delta
+    spawnCoins(amount, buttonIndex);
+
+    // If we were in animation-only mode and hidden, make it visible first then retarget shortly after
+    if (!alwaysVisible && !balanceVisible) {
       setTimeout(() => {
-        setIsAnimating(true);
-        setDiffStartIndex(getFirstDifferingPosition(oldBalance, newBalance));
-        startBalanceAnimation(newBalance, buttonIndex, amount);
-      }, 50 * animationSpeed); // Match the appearance transition duration
+        retargetCounterAnimation(newTarget);
+      }, 50 * animationSpeed);
     } else {
-      setIsAnimating(true);
-      setDiffStartIndex(getFirstDifferingPosition(oldBalance, newBalance));
-      startBalanceAnimation(newBalance, buttonIndex, amount);
+      retargetCounterAnimation(newTarget);
     }
   };
 
-  const startBalanceAnimation = (newBalance: number, buttonIndex: number, amount: number) => {
+  const spawnCoins = (amount: number, buttonIndex: number) => {
     // DOM based positions
     const buttonEl = buttonRefs[buttonIndex]?.current as HTMLElement | null;
-    const from = amount > 0 ? getElementCenter(buttonEl) : {x: MAX_X_OFFSET, y: MAX_Y_OFFSET};
-    const toCenter = amount > 0 ? {x: MAX_X_OFFSET, y: MAX_Y_OFFSET} : getElementCenter(buttonEl);
-    // Adjust final position to account for coin positioning
+    const from = amount > 0 ? getElementCenter(buttonEl) : { x: MAX_X_OFFSET, y: MAX_Y_OFFSET };
+    const toCenter = amount > 0 ? { x: MAX_X_OFFSET, y: MAX_Y_OFFSET } : getElementCenter(buttonEl);
     const to = { x: toCenter.x - 8, y: toCenter.y - 7 };
 
-    // Create coins along an arc
     const coinCount = Math.min(Math.max(Math.floor(Math.abs(amount) / 1000), 4), 12);
     const coins = Array.from({ length: coinCount }, (_, i) => {
-      // Create symmetric pattern: half coins negative midX, half positive midX
       const isLeftSide = i < coinCount / 2;
-      const midX = isLeftSide 
-        ? -Math.random() * MAX_X_OFFSET  // Negative midX for left side
-        : Math.random() * (MAX_X_OFFSET * 4);  // Positive midX for right side
-      // Y offset limited to not go higher than -MAX_Y_OFFSET
+      const midX = isLeftSide
+        ? -Math.random() * MAX_X_OFFSET
+        : Math.random() * (MAX_X_OFFSET * 4);
       const baseY = Math.min(from.y, to.y);
       const midY = baseY - Math.random() * MAX_Y_OFFSET;
-      // console.log('coins coinCount', coinCount);
-      // console.log('coins baseY', baseY);
-      // console.log('coins midX', midX, 'midY', midY);
-      // console.log('coins from', from.x, from.y, 'to', to.x, to.y);
       return {
         id: Date.now() + i,
         isCredit: amount > 0,
@@ -129,65 +157,62 @@ const BalanceCounter = () => {
         keyframesY: [from.y, midY, to.y]
       };
     });
-    setAnimatingCoins(coins);
+    setAnimatingCoins((prev) => {
+      const next = [...prev, ...coins];
+      // Soft cap to avoid unbounded arrays
+      return next.slice(-120);
+    });
 
-    // Animate the counter value
-    // const duration = Math.min(Math.abs(amount) / 8000 + 1.2, 3) * animationSpeed;
-    // setAnimDuration(duration);
-    animate(motionValue, newBalance, {
+    // finish after the last coin in this burst completes its flight
+    const maxDelay = coins.reduce((acc, c) => Math.max(acc, c.delay), 0);
+    const thisCoinsRunId = ++coinsRunIdRef.current;
+    if (coinFinishTimerRef.current) clearTimeout(coinFinishTimerRef.current);
+    coinFinishTimerRef.current = window.setTimeout(() => {
+      if (thisCoinsRunId !== coinsRunIdRef.current) return;
+      setIsAnimating(false);
+      setDiffStartIndex(-1);
+      setAnimatingCoins([]);
+      if (!alwaysVisible) {
+        hideTimerRef.current = window.setTimeout(() => {
+          setBalanceVisible(false);
+        }, 2000);
+      }
+    }, ((animatedCoinsDuration * animationSpeed) + maxDelay) * 1000 + HOLD_AFTER_MS);
+  };
+
+  const retargetCounterAnimation = (newTarget: number) => {
+    // Stop any in-flight tween and start a new one from the current value
+    animationControlsRef.current?.stop();
+    const localRunId = ++animationRunIdRef.current;
+    const currentVal = motionValue.get();
+    if (newTarget > currentVal) directionRef.current = 1;
+    else if (newTarget < currentVal) directionRef.current = -1;
+    // bump to restart highlight block with fresh direction/color keyframes
+    setAnimId((id) => id + 1);
+    animationControlsRef.current = animate(motionValue, newTarget, {
       duration: countingAnimationDuration * animationSpeed,
-      ease: "easeOut", // Start fast, then DRAMATICALLY slow down at the end
-      onUpdate: (motionValue) => {
-        console.log('onUpdate setDisplayBalance', motionValue);
-        setDisplayBalance(motionValue);
+      ease: "easeOut",
+      onUpdate: (val) => {
+        setDisplayBalance(val);
       },
       onComplete: () => {
-        console.log('onComplete setDisplayBalance', newBalance);
-        setBalance(newBalance);
-        setDisplayBalance(newBalance);
-        // Pause a bit on the final state before clearing highlight
-        setTimeout(() => {
-          console.log('holdTimer setIsAnimating false');
-          setIsAnimating(false);
-          setChangeAmount(0);
-          setDiffStartIndex(-1);
-          setAnimatingCoins([]);
-          
-          // Hide balance after delay if in animation-only mode
-          if (!alwaysVisible) {
-            setTimeout(() => {
-              setBalanceVisible(false);
-            }, 2000); // 2 seconds delay before hiding
-          }
-        }, HOLD_AFTER_MS);
+        // Ignore if superseded by a newer run
+        if (localRunId !== animationRunIdRef.current) return;
+        setBalance(newTarget);
+        setDisplayBalance(newTarget);
+        // finalization handled by coinFinishTimerRef scheduled in spawnCoins
       }
     });
   };
 
   const digits = getDigits(displayBalance);
-  const isCredit = changeAmount > 0;
+  const isCredit = directionRef.current > 0;
   
-  // Compute approximate width of the highlighted group only (diffStartIndex .. end)
-  const highlightedGroupWidthPx = useMemo(() => {
-    if (!isAnimating || diffStartIndex < 0) return 0;
-    const group = digits.slice(diffStartIndex);
-    const numCommas = group.reduce((acc, ch) => acc + (ch === ',' ? 1 : 0), 0);
-    const numDigits = group.length - numCommas;
-    console.log('highlightedGroupWidthPx', numDigits * DIGIT_PX + numCommas * COMMA_PX);
-    return numDigits * DIGIT_PX + numCommas * COMMA_PX;
-  }, [isAnimating, diffStartIndex, digits]);
-
-  const extraWidthPx = useMemo(() => {
-    if (!isAnimating) return 0;
-    const extra = Math.ceil(highlightedGroupWidthPx * (HIGHLIGHT_SCALE - 1));
-    console.log('extraWidthPx', extra);
-    return extra;
-  }, [isAnimating, highlightedGroupWidthPx]);
+  // (Removed width calculations used for previous layout compensation)
   
   // During animation, find which digits should be colored
   const shouldColorDigit = (index: number): boolean => {
-    if (!isAnimating || changeAmount === 0) return false;
-    // Use the precomputed index so highlight persists during the end hold
+    if (!isAnimating) return false;
     return diffStartIndex >= 0 && index >= diffStartIndex;
   };
 
@@ -210,7 +235,7 @@ const BalanceCounter = () => {
               y: coin.keyframesY,
               scale: [0.0, 1.0, 1.0, 1.0, 0.0]            }}
             transition={{
-              duration: countingAnimationDuration * animationSpeed,
+              duration: animatedCoinsDuration * animationSpeed,
               delay: coin.delay,
               ease: "easeOut"
             }}
@@ -227,7 +252,7 @@ const BalanceCounter = () => {
           initial={!alwaysVisible ? { opacity: 0, scale: 0.5 } : { opacity: 1, scale: 1 }}
           animate={balanceVisible ? { 
             opacity: 1, 
-            scale: [0.5, 1.25, 1] 
+            scale: [0.5, 1.4, 1] 
           } : { 
             opacity: 0, 
             scale: 0.5 
@@ -237,11 +262,11 @@ const BalanceCounter = () => {
               ? { 
                   opacity: { duration: 0.1 * animationSpeed },
                   scale: { 
-                    duration: 0.3 * animationSpeed,
+                    duration: 0.45 * animationSpeed,
                     ease: "easeInOut"
                   }
                 }
-              : { duration: 0.3 * animationSpeed }
+              : { duration: 0.2 * animationSpeed }
           }
           className="relative"
           style={{ transformOrigin: 'top left' }}
@@ -288,11 +313,11 @@ const BalanceCounter = () => {
                           color: [
                             '#1f2937',
                             '#1f2937',
-                              isCredit ? '#22c55e' : '#f97316',
-                              isCredit ? '#22c55e' : '#f97316',
-                              isCredit ? '#22c55e' : '#f97316',
-                              isCredit ? '#22c55e' : '#f97316',
-                              isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
+                            isCredit ? '#22c55e' : '#f97316',
                             '#1f2937'
                           ],
                           marginBottom: ['0px', '1px', '1px', '1px', '1px', '1px', '1px', '0px', '0px']
