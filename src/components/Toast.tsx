@@ -1,63 +1,113 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect } from 'react';
-import { Toast as ToastType } from '../types/toast';
+import { motion, useMotionValue, animate, PanInfo } from 'framer-motion';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Toast as ToastType, TOAST_CONFIG, SwipeDirection } from '../types/toast';
+import { useToast } from './NiceToastProvider';
 
 interface ToastProps {
   toast: ToastType;
-  onClose: (id: string) => void;
+  index: number;
+  total: number;
+  onHeightChange: (height: number) => void;
 }
 
-const Toast = ({ toast, onClose }: ToastProps) => {
-  const { id, message, type, position, duration = 4000, icon, backgroundColor, textColor, borderColor, onClick } = toast;
+const Toast = ({ toast, index, total, onHeightChange }: ToastProps) => {
+  const { hideToast, pauseToast, resumeToast } = useToast();
+  const [interacting, setInteracting] = useState(false);
+  const toastRef = useRef<HTMLDivElement>(null);
+  const heightRef = useRef<number>(0);
+  const swipeX = useMotionValue(0);
+  const swipeY = useMotionValue(0);
+  
+  const { 
+    id,
+    message,
+    type,
+    position = 'bottom',
+    icon,
+    onClick,
+    onDismiss,
+    dismissible = true,
+    jsx,
+    style,
+    className = '',
+    updateCount,
+    removed,
+  } = toast;
 
-  // Auto-dismiss timer
+  // Calculate if toast is visible (within visible limit)
+  const isVisible = index < TOAST_CONFIG.VISIBLE_TOASTS;
+
+  // Set mounted state
   useEffect(() => {
-    if (duration > 0) {
-      const timer = setTimeout(() => {
-        onClose(id);
-      }, duration);
+    const timer = setTimeout(() => {
+      toast.mounted = true;
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
-      return () => clearTimeout(timer);
+  // Measure height
+  useEffect(() => {
+    if (toastRef.current && toastRef.current.offsetHeight !== heightRef.current) {
+      heightRef.current = toastRef.current.offsetHeight;
+      onHeightChange(heightRef.current);
     }
-  }, [id, duration, onClose]);
+  });
 
-  // Default styling based on type
+  // Handle hover/interaction pausing
+  useEffect(() => {
+    if (interacting && toast.duration && toast.duration > 0) {
+      pauseToast(id);
+    } else if (!interacting && toast.pausedAt) {
+      resumeToast(id);
+    }
+  }, [interacting, id, pauseToast, resumeToast, toast.duration, toast.pausedAt]);
+
+  // Get default styling based on type
   const getDefaultStyling = () => {
     switch (type) {
       case 'success':
         return {
-          backgroundColor: backgroundColor || '#10b981',
-          textColor: textColor || '#ffffff',
-          borderColor: borderColor || '#059669',
+          backgroundColor: '#10b981',
+          borderColor: '#059669',
+          color: '#ffffff',
           icon: icon || '✓'
         };
       case 'error':
         return {
-          backgroundColor: backgroundColor || '#ef4444',
-          textColor: textColor || '#ffffff',
-          borderColor: borderColor || '#dc2626',
+          backgroundColor: '#ef4444',
+          borderColor: '#dc2626',
+          color: '#ffffff',
           icon: icon || '✕'
         };
       case 'warning':
         return {
-          backgroundColor: backgroundColor || '#f59e0b',
-          textColor: textColor || '#ffffff',
-          borderColor: borderColor || '#d97706',
+          backgroundColor: '#f59e0b',
+          borderColor: '#d97706',
+          color: '#ffffff',
           icon: icon || '⚠'
         };
       case 'info':
         return {
-          backgroundColor: backgroundColor || '#3b82f6',
-          textColor: textColor || '#ffffff',
-          borderColor: borderColor || '#2563eb',
+          backgroundColor: '#3b82f6',
+          borderColor: '#2563eb',
+          color: '#ffffff',
           icon: icon || 'ℹ'
+        };
+      case 'loading':
+        return {
+          backgroundColor: '#6b7280',
+          borderColor: '#4b5563',
+          color: '#ffffff',
+          icon: icon || (
+            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+          )
         };
       case 'custom':
       default:
         return {
-          backgroundColor: backgroundColor || '#6b7280',
-          textColor: textColor || '#ffffff',
-          borderColor: borderColor || '#4b5563',
+          backgroundColor: style?.backgroundColor || '#ffffff',
+          borderColor: style?.borderColor || '#e5e7eb',
+          color: style?.color || '#1f2937',
           icon: icon || ''
         };
     }
@@ -65,76 +115,171 @@ const Toast = ({ toast, onClose }: ToastProps) => {
 
   const styling = getDefaultStyling();
 
-  // Animation variants based on position
-  const variants = {
-    initial: position === 'top' 
-      ? { opacity: 0, y: -100, scale: 0.9 }
-      : { opacity: 0, y: 100, scale: 0.9 },
-    animate: { 
-      opacity: 1, 
-      y: 0, 
-      scale: 1,
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 25
-      }
-    },
-    exit: position === 'top'
-      ? { 
-          opacity: 0, 
-          y: -50, 
-          scale: 0.95,
-          transition: { duration: 0.2 }
-        }
-      : { 
-          opacity: 0, 
-          y: 50, 
-          scale: 0.95,
-          transition: { duration: 0.2 }
-        }
-  };
-
-  const handleClick = () => {
-    if (onClick) {
-      onClick();
+  // Calculate stacking transforms
+  const getStackingStyle = () => {
+    if (!isVisible) {
+      return {
+        scale: 0.8,
+        opacity: 0,
+        y: position === 'top' ? -20 : 20,
+      };
     }
+
+    const scale = 1 - (index * 0.05);
+    const opacity = 1 - (index * 0.1);
+    
+    // Calculate offset based on previous toasts' heights
+    let offset = 0;
+    for (let i = 0; i < index; i++) {
+      offset += TOAST_CONFIG.GAP;
+    }
+
+    const y = position === 'top' 
+      ? offset + (index * 10) // Slight additional offset for depth
+      : -(offset + (index * 10));
+
+    return {
+      scale: Math.max(scale, 0.85),
+      opacity: Math.max(opacity, 0.7),
+      y,
+      zIndex: total - index,
+    };
   };
 
-  const handleClose = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onClose(id);
-  };
+  const stackingStyle = getStackingStyle();
+
+  // Handle swipe
+  const handleSwipe = useCallback((_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (!dismissible) return;
+
+    const { offset, velocity } = info;
+    const swipeThreshold = TOAST_CONFIG.SWIPE_THRESHOLD;
+    
+    // Determine swipe direction
+    const isHorizontalSwipe = Math.abs(offset.x) > Math.abs(offset.y);
+    const swipeAmount = isHorizontalSwipe ? Math.abs(offset.x) : Math.abs(offset.y);
+    const swipeVelocity = isHorizontalSwipe ? Math.abs(velocity.x) : Math.abs(velocity.y);
+
+    if (swipeAmount > swipeThreshold || swipeVelocity > 500) {
+      // Determine direction
+      let direction: SwipeDirection;
+      if (isHorizontalSwipe) {
+        direction = offset.x > 0 ? 'right' : 'left';
+      } else {
+        direction = offset.y > 0 ? 'down' : 'up';
+      }
+
+      toast.swipeOut = true;
+      toast.swipeDirection = direction;
+      
+      onDismiss?.();
+      hideToast(id);
+    } else {
+      // Snap back
+      animate(swipeX, 0, { type: 'spring', stiffness: 400, damping: 30 });
+      animate(swipeY, 0, { type: 'spring', stiffness: 400, damping: 30 });
+    }
+  }, [dismissible, hideToast, id, onDismiss, swipeX, swipeY]);
+
+  // Render custom JSX if provided
+  if (jsx) {
+    return (
+      <motion.div
+        ref={toastRef}
+        layout
+        initial={{ opacity: 0, scale: 0.9, y: position === 'top' ? -20 : 20 }}
+        animate={{
+          opacity: removed ? 0 : stackingStyle.opacity,
+          scale: removed ? 0.8 : stackingStyle.scale,
+          y: removed ? (position === 'top' ? -50 : 50) : stackingStyle.y,
+        }}
+        exit={{ opacity: 0, scale: 0.8 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        style={{
+          zIndex: stackingStyle.zIndex,
+          x: swipeX,
+          y: swipeY,
+          ...style,
+        }}
+        className={`relative w-[var(--toast-width)] pointer-events-auto ${className}`}
+        drag={dismissible}
+        dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
+        dragElastic={0.2}
+        onDragEnd={handleSwipe}
+        onPointerDown={() => setInteracting(true)}
+        onPointerUp={() => setInteracting(false)}
+        onPointerLeave={() => setInteracting(false)}
+        onClick={onClick}
+        whileTap={{ scale: onClick ? 0.98 : 1 }}
+      >
+        {jsx}
+      </motion.div>
+    );
+  }
+
+  // Attention animation for duplicates
+  const attentionAnimation = updateCount > 0 ? {
+    scale: [stackingStyle.scale, stackingStyle.scale * 1.05, stackingStyle.scale],
+  } : {};
 
   return (
     <motion.div
+      ref={toastRef}
       layout
-      variants={variants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className={`
-        relative max-w-sm w-full rounded-lg shadow-lg backdrop-blur-sm
-        ${onClick ? 'cursor-pointer' : ''}
-      `}
-      style={{
-        backgroundColor: styling.backgroundColor,
-        color: styling.textColor,
-        border: `1px solid ${styling.borderColor}`,
-        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
+      initial={{ opacity: 0, scale: 0.9, y: position === 'top' ? -20 : 20 }}
+      animate={{
+        opacity: removed ? 0 : stackingStyle.opacity,
+        scale: removed ? 0.8 : stackingStyle.scale,
+        y: removed ? (position === 'top' ? -50 : 50) : stackingStyle.y,
+        ...attentionAnimation,
       }}
-      onClick={handleClick}
-      whileHover={onClick ? { scale: 1.02 } : undefined}
-      whileTap={onClick ? { scale: 0.98 } : undefined}
+      exit={{ opacity: 0, scale: 0.8 }}
+      transition={{ 
+        type: 'spring', 
+        stiffness: 400, 
+        damping: 30,
+        scale: attentionAnimation.scale ? {
+          duration: 0.3,
+          times: [0, 0.5, 1],
+        } : undefined,
+      }}
+      style={{
+        zIndex: stackingStyle.zIndex,
+        x: swipeX,
+        ...style,
+      }}
+      className={`
+        relative w-[var(--toast-width)] rounded-lg shadow-lg backdrop-blur-sm pointer-events-auto
+        ${onClick ? 'cursor-pointer' : ''}
+        ${className}
+      `}
+      drag={dismissible ? "x" : false}
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.2}
+      onDragEnd={handleSwipe}
+      onPointerDown={() => setInteracting(true)}
+      onPointerUp={() => setInteracting(false)}
+      onPointerLeave={() => setInteracting(false)}
+      onClick={onClick}
+      whileTap={{ scale: onClick ? 0.98 : 1 }}
     >
-      <div className="flex items-center p-4">
+      <div 
+        className="flex items-center p-4 rounded-lg border"
+        style={{
+          backgroundColor: styling.backgroundColor,
+          borderColor: styling.borderColor,
+          color: styling.color,
+        }}
+      >
         {/* Icon */}
         {styling.icon && (
           <div className="flex-shrink-0 mr-3">
-            {styling.icon.startsWith('/') || styling.icon.startsWith('http') ? (
-              <img src={styling.icon} alt="Toast icon" className="w-5 h-5" />
+            {typeof styling.icon === 'string' && (styling.icon.startsWith('/') || styling.icon.startsWith('http')) ? (
+              <img src={styling.icon} alt="" className="w-5 h-5" />
             ) : (
-              <span className="text-lg font-bold">{styling.icon}</span>
+              <span className="text-lg font-bold flex items-center justify-center">
+                {styling.icon}
+              </span>
             )}
           </div>
         )}
@@ -142,27 +287,40 @@ const Toast = ({ toast, onClose }: ToastProps) => {
         {/* Message */}
         <div className="flex-1 text-sm font-medium">
           {message}
+          {updateCount > 0 && (
+            <span className="ml-2 text-xs opacity-70">
+              ({updateCount + 1}x)
+            </span>
+          )}
         </div>
 
         {/* Close button */}
-        <button
-          onClick={handleClose}
-          className="flex-shrink-0 ml-3 p-1 rounded-full hover:bg-black/10 transition-colors"
-          aria-label="Close toast"
-        >
-          <span className="text-lg leading-none">×</span>
-        </button>
+        {dismissible && type !== 'loading' && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDismiss?.();
+              hideToast(id);
+            }}
+            className="flex-shrink-0 ml-3 p-1 rounded-full hover:bg-black/10 transition-colors"
+            aria-label="Close toast"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        )}
       </div>
-
-      {/* Progress bar for timed toasts */}
-      {duration > 0 && (
-        <motion.div
-          className="absolute bottom-0 left-0 h-1 bg-white/30 rounded-b-lg"
-          initial={{ width: '100%' }}
-          animate={{ width: '0%' }}
-          transition={{ duration: duration / 1000, ease: 'linear' }}
-        />
-      )}
     </motion.div>
   );
 };

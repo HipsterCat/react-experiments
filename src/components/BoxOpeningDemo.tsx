@@ -3,12 +3,13 @@ import { Button, Text, Title } from '@telegram-apps/telegram-ui';
 import { useBalanceAnimation } from '../hooks/useBalanceAnimation';
 import { useBoxOpening } from '../hooks/useBoxOpening';
 import { useToast } from './NiceToastProvider';
+import { toast, toastHelpers } from '../utils/toast';
 import { purchaseBox, type PurchaseBoxResponse } from '../services/mockBoxService';
 
 const BoxOpeningDemo: React.FC = () => {
   const { changeBalance } = useBalanceAnimation();
   const { openBoxModal, loadBoxContents, boxContents } = useBoxOpening();
-  const { showToast } = useToast();
+  const { showToast, clearAllToasts } = useToast();
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
   const handlePurchaseBox = async () => {
@@ -167,62 +168,179 @@ const BoxOpeningDemo: React.FC = () => {
           <Text className="text-gray-800 text-sm font-semibold mb-3">
             🍞 Toast Notifications Demo:
           </Text>
+          
+          {/* Basic Toasts */}
           <div className="grid grid-cols-2 gap-2">
             <Button
               size="s"
               mode="outline"
               onClick={() => showToast({
-                message: 'Success from top! 🎉',
+                message: 'Success! Task completed',
                 type: 'success',
                 position: 'top',
-                duration: 3000
               })}
               className="text-xs"
             >
-              Success Top
+              Success
             </Button>
             <Button
               size="s"
               mode="outline"
               onClick={() => showToast({
-                message: 'Error from bottom! ❌',
+                message: 'Error occurred!',
                 type: 'error',
                 position: 'bottom',
-                duration: 3000
               })}
               className="text-xs"
             >
-              Error Bottom
+              Error
             </Button>
             <Button
               size="s"
               mode="outline"
               onClick={() => showToast({
-                message: 'Warning message! ⚠️',
-                type: 'warning',
+                message: 'Loading data...',
+                type: 'loading',
                 position: 'top',
-                duration: 4000
+                duration: 0, // Manual dismiss
               })}
               className="text-xs"
             >
-              Warning
+              Loading
             </Button>
             <Button
               size="s"
               mode="outline"
               onClick={() => showToast({
-                message: 'Custom toast with coin icon',
-                type: 'custom',
+                message: 'Info: Swipe to dismiss!',
+                type: 'info',
                 position: 'bottom',
-                duration: 5000,
-                icon: '/src/assets/icon_coin.webp',
-                backgroundColor: '#8b5cf6',
-                textColor: '#ffffff',
-                borderColor: '#7c3aed'
               })}
               className="text-xs"
             >
-              Custom
+              Info
+            </Button>
+          </div>
+          
+          {/* Rich Toasts */}
+          <Text className="text-gray-800 text-sm font-semibold mt-4 mb-2">
+            Rich Animated Toasts:
+          </Text>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              size="s"
+              mode="outline"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                showToast(toastHelpers.inventory(
+                  '/src/assets/boxes/rewards/mystery_box.webp',
+                  'Mystery Box',
+                  3,
+                  'add',
+                  { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+                ));
+              }}
+              className="text-xs"
+            >
+              + Inventory
+            </Button>
+            <Button
+              size="s"
+              mode="outline"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                showToast(toastHelpers.reward(
+                  '/src/assets/icon_coin.webp',
+                  'Coins',
+                  '500',
+                  { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+                ));
+              }}
+              className="text-xs"
+            >
+              + Reward
+            </Button>
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => {
+                showToast(toastHelpers.achievement(
+                  'First Purchase!',
+                  'You bought your first mystery box',
+                  '/src/assets/boxes/star.webp'
+                ));
+              }}
+              className="text-xs"
+            >
+              Achievement
+            </Button>
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => {
+                // Stack multiple toasts
+                showToast({ message: 'First in stack', type: 'info', position: 'bottom' });
+                setTimeout(() => {
+                  showToast({ message: 'Second (on top)', type: 'success', position: 'bottom' });
+                  setTimeout(() => {
+                    showToast({ message: 'Third (newest)', type: 'warning', position: 'bottom' });
+                  }, 300);
+                }, 300);
+              }}
+              className="text-xs"
+            >
+              Stack Test
+            </Button>
+          </div>
+
+          {/* Test Features */}
+          <Text className="text-gray-800 text-sm font-semibold mt-4 mb-2">
+            Test Features:
+          </Text>
+          <div className="flex gap-2">
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => {
+                // Test duplicate detection
+                showToast({
+                  message: 'Duplicate test toast',
+                  type: 'warning',
+                  position: 'top',
+                  variantId: 'test-duplicate'
+                });
+              }}
+              className="text-xs flex-1"
+            >
+              Duplicate
+            </Button>
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => {
+                showToast({
+                  message: 'Click me!',
+                  type: 'info',
+                  position: 'top',
+                  onClick: () => alert('Toast clicked!'),
+                  dismissible: false, // Can't swipe
+                });
+              }}
+              className="text-xs flex-1"
+            >
+              Clickable
+            </Button>
+            <Button
+              size="s"
+              mode="outline"
+              onClick={() => {
+                // Clear all toasts
+                const { clearAllToasts } = useToast();
+                clearAllToasts();
+              }}
+              className="text-xs flex-1"
+            >
+              Clear All
             </Button>
           </div>
         </div>

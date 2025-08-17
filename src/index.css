@@ -151,3 +151,12 @@ button[class^="tgui"]::after {
 #tc-widget-root {
   pointer-events: initial;
 }
+
+/* Toast Styles */
+[data-toast-position] {
+  pointer-events: none;
+}
+
+[data-toast-position] > * {
+  pointer-events: auto;
+}
