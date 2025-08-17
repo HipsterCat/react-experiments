@@ -95,31 +95,64 @@ const DemoToast = forwardRef<DemoToastRef, DemoToastProps>(({ position = 'bottom
         }}
       >
         <div className="absolute inset-0 flex items-center px-4 overflow-hidden">
-          <AnimatePresence>
-            {toast && (
-              <motion.div
-                key={toast.id}
-                className="flex items-center w-full"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, transition: { duration: 0.2, delay: 0.15 } }}
-                exit={{ opacity: 0, transition: { duration: 0.15 } }}
-                layout
-              >
-                <motion.div
-                  className="relative flex-shrink-0 flex items-center justify-center rounded-full text-sm font-bold"
-                  style={{ width: 40, height: 40, backgroundColor: iconStyling?.bg, color: iconStyling?.color }}
-                  layout
-                >
-                  {iconStyling?.icon}
-                </motion.div>
-                {activeSize !== 'collapsed' && (
-                  <motion.div className="ml-3 text-left" layout>
-                    <p className="text-white font-medium text-sm whitespace-nowrap">{toast.message}</p>
+          {/* This wrapper is persistent and lets layout animations work */}
+          <motion.div
+            className="flex items-center w-full"
+            animate={{ opacity: toast ? 1 : 0 }}
+            initial={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* Icon */}
+            <motion.div
+              className="relative flex-shrink-0 flex items-center justify-center rounded-full text-sm font-bold"
+              style={{ width: 40, height: 40 }}
+              layout
+            >
+              <AnimatePresence>
+                {iconStyling && (
+                  <motion.div
+                    key={toast?.type}
+                    className="absolute inset-0 rounded-full"
+                    style={{ backgroundColor: iconStyling.bg }}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                  />
+                )}
+              </AnimatePresence>
+              <AnimatePresence>
+                {iconStyling && (
+                  <motion.div
+                    key={toast?.id}
+                    className="absolute inset-0 flex items-center justify-center"
+                    style={{ color: iconStyling.color }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1, transition: { delay: 0.1 } }}
+                    exit={{ opacity: 0 }}
+                  >
+                    {iconStyling.icon}
                   </motion.div>
                 )}
+              </AnimatePresence>
+            </motion.div>
+
+            {/* Text Content */}
+            {activeSize !== 'collapsed' && (
+              <motion.div className="ml-3 text-left overflow-hidden" layout>
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={toast?.message}
+                    className="text-white font-medium text-sm whitespace-nowrap"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0, transition: { type: 'spring', stiffness, damping } }}
+                    exit={{ opacity: 0, y: -10, transition: { duration: 0.15 } }}
+                  >
+                    {toast?.message}
+                  </motion.p>
+                </AnimatePresence>
               </motion.div>
             )}
-          </AnimatePresence>
+          </motion.div>
         </div>
       </motion.div>
     </div>
