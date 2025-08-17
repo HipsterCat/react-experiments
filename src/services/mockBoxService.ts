@@ -2,17 +2,17 @@ import { InventoryReward, ServiceBoxOpenResponse, ServiceBoxContentResponse } fr
 
 // Mock box data with different reward types
 const MOCK_REWARDS: InventoryReward[] = [
+    { reward_type: "usdt", reward_value: 30 },
+    { reward_type: "box", reward_value: 14 }, // legend
+    { reward_type: "coins", reward_value: 1000 },
+    { reward_type: "usdt", reward_value: 5 },
+    { reward_type: "box", reward_value: 11 },
   { reward_type: "coins", reward_value: 50 },
-  { reward_type: "coins", reward_value: 100 },
-  { reward_type: "coins", reward_value: 300 },
-  { reward_type: "coins", reward_value: 1000 },
-  { reward_type: "usdt", reward_value: 1 },
-  { reward_type: "usdt", reward_value: 5 },
-  { reward_type: "usdt", reward_value: 30 },
-  { reward_type: "box", reward_value: 11 },
-  { reward_type: "box", reward_value: 12 }, // rare
-  { reward_type: "box", reward_value: 13 }, // epic
-  { reward_type: "box", reward_value: 14 }, // legend
+    { reward_type: "box", reward_value: 12 }, // rare
+    { reward_type: "coins", reward_value: 100 },
+    { reward_type: "usdt", reward_value: 1 },
+    { reward_type: "box", reward_value: 13 }, // epic
+    { reward_type: "coins", reward_value: 300 },
 ];
 
 // Simulate API delay

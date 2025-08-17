@@ -1,9 +1,11 @@
-import coin_icon from "../assets/boxes/rewards/coin.webp";
-import coin_1000_icon from "../assets/boxes/rewards/coins_1000.webp";
-import coin_100_icon from "../assets/boxes/rewards/coins_100.webp";
-import coin_300_icon from "../assets/boxes/rewards/coins_300.webp";
-import dollar_icon from "../assets/boxes/rewards/dollar.webp";
-import dollars_stack_icon from "../assets/boxes/rewards/dollars_stack.webp";
+
+import coin_1000_icon from "../assets/boxes/rewards/reward_coins_1000.webp";
+import coin_100_icon from "../assets/boxes/rewards/reward_coins_100.webp";
+import coin_300_icon from "../assets/boxes/rewards/reward_coins_300.webp";
+import coin_50_icon from "../assets/boxes/rewards/reward_coins_50.webp";
+import usdt_1_icon from "../assets/boxes/rewards/reward_usdt_1.webp";
+import usdt_20_icon from "../assets/boxes/rewards/reward_usdt_20.webp";
+import usdt_50_icon from "../assets/boxes/rewards/reward_usdt_50.webp";
 import mystery_box_icon from "../assets/boxes/rewards/mystery_box.webp";
 import question_icon from "../assets/boxes/rewards/question.webp";
 import telegram_icon from "../assets/boxes/rewards/telegram.webp";
@@ -31,15 +33,21 @@ const getRewardIcon = (
             : reward.reward_value >= 100
             ? coin_100_icon
             : reward.reward_value >= 50
-            ? coin_icon
-            : coin_icon,
-        sPosition: "-rotate-2 right-4 bottom-3",
+            ? coin_50_icon
+            : coin_50_icon,
+        sPosition: "rotate-2 left-6 bottom",
       };
     case "usdt":
+      return {
+        icon:
+          reward.reward_value >= 50
+            ? usdt_50_icon
+            : reward.reward_value >= 20
+            ? usdt_20_icon
+            : usdt_1_icon,
+        sPosition: "-rotate-3 right-2 bottom-2",
+      };
     case "ton":
-      return reward.reward_value > 1
-        ? { icon: dollars_stack_icon, sPosition: "rotate-2 left-4 bottom-2" }
-        : { icon: dollar_icon, sPosition: "-rotate-2 right-4 bottom-2" };
     case "telegram_premium":
       return { icon: telegram_icon, sPosition: "rotate-3 left-0 bottom-2" };
     case "double_balance":
@@ -54,10 +62,10 @@ const getRewardIcon = (
             : reward.reward_value === 14
             ? box_legend_icon
             : box_regular_icon,
-        sPosition: "-rotate-5 -right-2 bottom-1",
+        sPosition: "rotate-5 -left-2 bottom-1",
       };
     default:
-      return { icon: mystery_box_icon, sPosition: "" };
+      return { icon: "", sPosition: "" };
   }
 };
 
@@ -77,14 +85,14 @@ export function RewardTypeImage({
   return (
     <div className={clsx(className, "relative")}>
       <img src={icon} alt="" className="w-full h-full" />
-      {!wheelSpinState && <RewardBoxRareBadge reward={reward} />}
-      {badgeSize != null && (
+      {wheelSpinState !== 'SPINNING' && <RewardBoxRareBadge reward={reward} />}
+      {badgeSize !== null && ((badgeSize === "s" && reward.reward_type !== "box") || badgeSize === "m") && (
         <RewardTypeBadge
           reward={reward}
           size={badgeSize}
           className={clsx(
             badgeSize === "s" && `absolute bottom-0 ${sPosition}`,
-            badgeSize === "m" && "mt-5"
+            badgeSize === "m" && "mt-5 absolute -bottom-10 left-1/2 transform -translate-x-1/2"
           )}
         />
       )}

@@ -88,7 +88,10 @@ export const BoxOpeningProvider: FC<{ children: ReactNode }> = ({ children }) =>
           reward.reward_type !== "telegram_premium"
       );
 
+      // Create multiple copies for seamless infinite loop
       const mappedPrizes: PrizeItem[] = [
+        ...filteredRewards,
+        ...filteredRewards,
         ...filteredRewards,
         ...filteredRewards,
       ].map((reward) => ({

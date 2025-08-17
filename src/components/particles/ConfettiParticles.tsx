@@ -7,9 +7,7 @@ interface ConfettiParticlesProps {
 }
 
 export const ConfettiParticles: React.FC<ConfettiParticlesProps> = ({ 
-  count = 40, 
-  margin = 8, 
-  padding = 8 
+  count = 40 
 }) => {
   // Simple animated sparkles effect
   return (

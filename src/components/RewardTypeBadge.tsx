@@ -35,13 +35,13 @@ export function RewardTypeBadge({
   return (
     <div
       className={clsx(
-        "bg-white rounded-[40px] flex items-center justify-center px-[9px] py-[5px]",
-        "text-rounded",
+        "bg-white rounded-[40px] inline-flex items-center justify-center px-[10px] py-[5px]",
+        "text-rounded whitespace-nowrap",
         "font-[800] text-gray-900",
         className,
         size === "s" && "text-[16px]"
       )}
-      style={{ boxShadow: "0px 0px 16px rgba(0, 0, 0, 0.2)" }}
+      style={{ boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.2)" }}
     >
       <span>{getPrizeLabel(reward.reward_type, reward.reward_value)}</span>
     </div>

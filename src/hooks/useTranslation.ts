@@ -8,15 +8,16 @@ export const useTranslation = () => {
     "box_open.later_open_later_inventory": "You can open this later from your inventory",
     "common.button_continue": "Continue",
     "profilePage.dailyModal.error": "Something went wrong",
-    "reward_type.coins": "{{count}} Coins",
-    "reward_type.usdt": "${{count}} USDT",
+    "reward_type.coins": "{{count}} COINS",
+    "reward_type.usdt": "{{count}} USDT",
     "reward_type.ton": "{{count}} TON",
     "reward_type.telegram_premium": "Telegram Premium",
     "reward_type.double_balance": "Double Balance",
-    "reward_type.box": "Mystery Box",
-    "reward_type.box_rare": "Rare Box",
-    "reward_type.box_epic": "Epic Box", 
-    "reward_type.box_legend": "Legendary Box",
+    "reward_type.box": "LOOT BOX",
+    "reward_type.box_rare": "RARE",
+    "reward_type.box_epic": "EPIC", 
+    "reward_type.box_legend": "LEGENDARY",
+    "reward_type.box_basic": "BASIC",
   };
 
   const t = (key: string, options?: { count?: number }) => {

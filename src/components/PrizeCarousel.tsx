@@ -1,9 +1,9 @@
 import type { InventoryReward } from "../types/rewards";
 import { RewardTypeImage } from "./RewardTypeImage";
-import { findPrizeIndex } from "../utils/findPrizeIndex";
 import useEmblaCarousel from "embla-carousel-react";
 import type { Dispatch } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export type WheelSpinState = "IDLE" | "SPINNING" | "STOPPED";
 
@@ -12,6 +12,9 @@ interface PrizeCarouselProps {
   wheelSpinState: WheelSpinState;
   actualReward: InventoryReward | null;
   setSpinState: Dispatch<WheelSpinState>;
+  showRevealAnimation?: boolean;
+  onRevealComplete?: () => void;
+  onFinalReward?: (reward: InventoryReward) => void;
 }
 
 function getDistance(a: number, b: number, length: number): number {
@@ -24,14 +27,19 @@ export const PrizeCarousel = ({
   wheelSpinState,
   actualReward,
   setSpinState,
+  showRevealAnimation,
+  onRevealComplete,
+  onFinalReward,
 }: PrizeCarouselProps) => {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     axis: "y",
     loop: true,
     dragFree: false,
     align: "center",
-    startIndex: 3,
+    startIndex: Math.floor(prizes.length / 2),
     watchDrag: false,
+    skipSnaps: false,
+    containScroll: false,
   });
 
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -40,8 +48,27 @@ export const PrizeCarousel = ({
   const animationRef = useRef<number>();
 
   const spinStartTimeRef = useRef<number>();
-  const targetIndexRef = useRef<number>();
   const lastScrollTimeRef = useRef<number>();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[PrizeCarousel] State:', {
+      selectedIndex,
+      wheelSpinState,
+      showRevealAnimation,
+      actualReward
+    });
+  }, [selectedIndex, wheelSpinState, showRevealAnimation, actualReward]);
+
+  // Handle reveal completion
+  useEffect(() => {
+    if (showRevealAnimation && onRevealComplete) {
+      const timer = setTimeout(() => {
+        onRevealComplete();
+      }, 500); // Match the previous animation duration
+      return () => clearTimeout(timer);
+    }
+  }, [showRevealAnimation, onRevealComplete]);
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
@@ -78,73 +105,81 @@ export const PrizeCarousel = ({
       return clear;
     }
 
-    if (wheelSpinState === "SPINNING" && actualReward) {
+    if (wheelSpinState === "SPINNING") {
       clear();
 
       console.log("=== SPIN START ===");
-      console.log("Actual Reward:", actualReward);
       console.log("Current Index:", emblaApi.selectedScrollSnap());
 
-      const targetIndex = findPrizeIndex({
-        prizes,
-        targetReward: actualReward,
-        currentIndex: emblaApi.selectedScrollSnap(),
-      });
-
-      if (targetIndex === null) {
-        console.log("No valid prize index found, closing modal");
-        setSpinState("STOPPED");
-        return clear;
-      }
-
-      console.log("Selected target index:", targetIndex);
-      console.log("Current index:", emblaApi.selectedScrollSnap());
-
-      targetIndexRef.current = targetIndex;
       spinStartTimeRef.current = Date.now();
-      lastScrollTimeRef.current = Date.now();
+      lastScrollTimeRef.current = Date.now() - 100; // Start with a gap so first scroll happens immediately
 
-      const minSpinDuration = 3000;
-      const maxSpinDuration = 10000;
+      const spinDuration = 4000 + Math.random() * 1000; // 4-5 seconds
+
+      let scrollCount = 0;
+      let lastLogTime = Date.now();
 
       const animate = () => {
         const now = Date.now();
         const totalElapsed = now - (spinStartTimeRef.current || 0);
         const timeSinceLastScroll = now - (lastScrollTimeRef.current || 0);
 
-        const progress = Math.min(totalElapsed / maxSpinDuration, 1);
-        const easeProgress = progress * progress;
-        const currentDelay = 50 + easeProgress * 800;
+        // Calculate progress with smooth easing
+        const progress = Math.min(totalElapsed / spinDuration, 1);
+        
+        // Use much gentler quadratic easing for gradual slowdown
+        const easedProgress = progress * progress;
+        
+        // Calculate current delay based on eased progress
+        // Start with minDelay (fast), end with maxDelay (slow)
+        const minDelay = 10;
+        const maxDelay = 400; // Reduced max delay
+        const currentDelay = minDelay + (maxDelay - minDelay) * easedProgress;
 
-        if (
-          timeSinceLastScroll < currentDelay &&
-          totalElapsed < maxSpinDuration
-        ) {
-          animationRef.current = requestAnimationFrame(animate);
-          return;
+        // Debug logging every 500ms
+        if (now - lastLogTime > 500) {
+          console.log(`[SPIN DEBUG] Elapsed: ${totalElapsed}ms/${spinDuration}ms, Progress: ${(progress * 100).toFixed(1)}%, EasedProgress: ${(easedProgress * 100).toFixed(1)}%, CurrentDelay: ${currentDelay.toFixed(1)}ms, ScrollCount: ${scrollCount}, CurrentIndex: ${emblaApi.selectedScrollSnap()}, PrizeLength: ${prizes.length}`);
+          lastLogTime = now;
         }
 
-        const currentIndex = emblaApi.selectedScrollSnap();
-        const nextIndex = (currentIndex + 1) % prizes.length;
+        if (timeSinceLastScroll >= currentDelay) {
+          const beforeIndex = emblaApi.selectedScrollSnap();
+          emblaApi.scrollNext();
+          scrollCount++;
+          lastScrollTimeRef.current = now;
+          
+          const afterIndex = emblaApi.selectedScrollSnap();
+          
+          // Log every scroll for detailed tracking
+          if (scrollCount % 10 === 0 || currentDelay > 200) {
+            console.log(`[SCROLL] #${scrollCount}: ${beforeIndex} -> ${afterIndex}, Delay: ${currentDelay.toFixed(1)}ms, TimeSinceLastScroll: ${timeSinceLastScroll.toFixed(1)}ms`);
+          }
+        }
 
-        if (
-          totalElapsed > minSpinDuration &&
-          nextIndex === (targetIndexRef.current || 0)
-        ) {
+        // Continue until time is up AND we have minimum scrolls
+        const minScrolls = 40;
+        if (totalElapsed < spinDuration || scrollCount < minScrolls) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          // Stop at current position
           if (animationRef.current) {
             cancelAnimationFrame(animationRef.current);
           }
 
-          emblaApi.scrollNext();
-          const onSettle = () => {
-            emblaApi.off("settle", onSettle);
+          const finalIndex = emblaApi.selectedScrollSnap();
+          console.log(`[SPIN END] Total scrolls: ${scrollCount}, Final index: ${finalIndex}, Total rotations: ${(scrollCount / prizes.length).toFixed(2)}`);
+          console.log("Prize at index:", prizes[finalIndex]);
+          // Report final reward to parent BEFORE stopping so it can react immediately
+          window.setTimeout(() => {
+          if (onFinalReward) {
+            try {
+              onFinalReward(prizes[finalIndex]);
+            } catch (e) {
+              console.warn("onFinalReward callback failed:", e);
+            }
+          }
             setSpinState("STOPPED");
-          };
-          emblaApi.on("settle", onSettle);
-        } else {
-          emblaApi.scrollNext();
-          lastScrollTimeRef.current = now;
-          animationRef.current = requestAnimationFrame(animate);
+          }, 500);
         }
       };
 
@@ -152,36 +187,110 @@ export const PrizeCarousel = ({
     }
 
     return clear;
-  }, [emblaApi, wheelSpinState, actualReward, setSpinState, prizes]);
+  }, [emblaApi, wheelSpinState, setSpinState, prizes, onFinalReward]);
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-      <div className="overflow-hidden h-full w-full" ref={emblaRef}>
-        <div className="flex flex-col items-center h-full">
+    <div className="embla absolute inset-0 flex items-center justify-center overflow-hidden">
+      <style>
+        {`
+          .embla {
+            --slide-height: 25vh;
+            --slide-spacing: 5px;
+            --slide-size: 25vh;
+          }
+          .embla__viewport {
+            overflow: hidden;
+            height: 100%;
+            width: 100%;
+          }
+          .embla__container {
+            display: flex;
+            touch-action: pan-x pinch-zoom;
+            height: 100%;
+            flex-direction: column;
+            will-change: transform;
+            will-change: opacity;
+          }
+          .embla__slide {
+            transform: translate3d(0, 0, 0);
+            flex: 0 0 var(--slide-size);
+            min-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-top: var(--slide-spacing);
+            padding-bottom: var(--slide-spacing);
+          }
+        `}
+      </style>
+      
+      <div className="embla__viewport" ref={emblaRef}>
+        <div className="embla__container">
           {prizes.map((prize, index) => {
             const distance = getDistance(index, selectedIndex, prizes.length);
-            const isCenter = distance === 0 && wheelSpinState === "IDLE";
-            const isAdjacent = distance === 1 && wheelSpinState === "IDLE";
-            const isFar = distance > 1 && wheelSpinState === "IDLE";
+            const isCenter = distance === 0;
+            const isSelected = index === selectedIndex;
+            
+            // Calculate animation values
+            const scaleValue = wheelSpinState === "IDLE" && isCenter ? 1.0 : 
+                              wheelSpinState === "IDLE" && distance === 1 ? 0.7 :
+                              wheelSpinState === "IDLE" && distance > 1 ? 0.7 :
+                              wheelSpinState === "STOPPED" && isCenter ? 1.2 :
+                              wheelSpinState === "STOPPED" && !isCenter ? 0 : 
+                              wheelSpinState === "SPINNING" ? 0.7 : 1.0;
+            
+            const opacityValue = wheelSpinState === "IDLE" && distance === 1 ? 1.0 :
+                                wheelSpinState === "IDLE" && distance > 1 ? 0.8 :
+                                wheelSpinState === "STOPPED" && !isCenter ? 0 : 1;
+            
+            // Debug logging for visibility issues
+            if (wheelSpinState === "STOPPED" && isSelected) {
+              console.log(`[PrizeCarousel] STOPPED state - Selected item ${index}:`, {
+                isCenter,
+                isSelected,
+                distance,
+                selectedIndex,
+                wheelSpinState,
+                showRevealAnimation,
+                scaleValue,
+                opacityValue
+              });
+            }
+            
+            // Use revealed reward for selected item during reveal animation
+            const displayPrize = (showRevealAnimation && isSelected && actualReward) 
+              ? actualReward 
+              : prize;
+
             return (
-              <div
-                key={`${prize.reward_type}-${prize.reward_value}-${index}`}
-                className={`relative ${isCenter ? "scale-120 z-20" : ""} ${isAdjacent ? "opacity-70 z-10" : ""} ${isFar ? "opacity-50 scale-90 z-0" : ""} py-10    will-change-transform will-change-opacity box-content`}
-                style={{ width: 165, height: 165 }}
-              >
-                <RewardTypeImage
-                  reward={prize}
-                  className="w-full h-full"
-                  badgeSize={wheelSpinState === "IDLE" ? "s" : undefined}
-                  wheelSpinState={wheelSpinState}
-                />
+              <div className="embla__slide" key={`${prize.reward_type}-${prize.reward_value}-${index}`}>
+                <motion.div
+                  className="relative will-change-transform will-change-opacity"
+                  initial={false}
+                  style={{ height: "100%" }}
+                  animate={{
+                    scale: scaleValue,
+                    opacity: opacityValue,
+                  }}
+                  transition={{ 
+                    duration: 0.4, 
+                    ease: [0.34, 1.56, 0.64, 1]
+                  }}
+                >
+                  <RewardTypeImage
+                    reward={displayPrize}
+                    className="w-full h-full"
+                    badgeSize={wheelSpinState === 'SPINNING' ? undefined : (wheelSpinState === 'STOPPED' && (isCenter || isSelected)) ? 'm' : 's'}
+                    wheelSpinState={wheelSpinState}
+                  />
+                </motion.div>
               </div>
             );
           })}
         </div>
       </div>
 
-      {wheelSpinState !== "IDLE" && (
+      {wheelSpinState === 'SPINNING' && (
         <svg
           className="absolute top-[50%] left-[50%] z-10 ml-[-140px] mt-[-14px]"
           width="280"

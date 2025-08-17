@@ -1,6 +1,7 @@
 import React, { useEffect, useState, ReactNode } from 'react';
 import { Icon28Close } from "@telegram-apps/telegram-ui/dist/icons/28/close";
 import { useTabbarContext } from "../hooks/useTabbarContext";
+import { motion } from "framer-motion";
 
 interface AnimatedFullscreenProps {
   isOpen: boolean;
@@ -12,6 +13,8 @@ interface AnimatedFullscreenProps {
   disableTabbarToggle?: boolean;
   showCloseButton?: boolean;
   closeButtonColor?: string;
+  overlayImage?: string;
+  showOverlay?: boolean;
 }
 
 export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
@@ -23,7 +26,9 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
   animationType = 'scale',
   disableTabbarToggle = false,
   showCloseButton = true,
-  closeButtonColor = '#000'
+  closeButtonColor = '#000',
+  overlayImage,
+  showOverlay = false
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -130,17 +135,24 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
         }}
       />
       
-      {/* Overlay for additional effects */}
-      {animationType === 'circle' && (
-        <div
+      {/* Overlay Layer (above background for blend mode) */}
+      {overlayImage && (
+        <motion.div
           className="absolute inset-0"
           style={{
-            background: `radial-gradient(circle at center, transparent ${isAnimating ? '60%' : '0%'}, rgba(0,0,0,0.3) ${isAnimating ? '100%' : '0%'})`,
-            transition: 'background 500ms cubic-bezier(0.4, 0, 0.2, 1)',
-            transitionDelay: '100ms',
+            backgroundImage: `url(${overlayImage})`,
+            backgroundSize: '100% 100%',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'center',
+            mixBlendMode: 'overlay',
           }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: showOverlay ? 1 : 0 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
         />
       )}
+      
+
 
       {/* Content Container */}
       <div className="relative w-full h-full flex items-center justify-center">
@@ -148,7 +160,7 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
         {showCloseButton && (
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 z-[11001] p-2 rounded-full bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-colors"
+            className="absolute top-4 right-4 z-[11001] p-2 rounded-full transition-colors"
             style={{ 
               color: closeButtonColor,
               transform: isAnimating ? 'scale(1) rotate(0deg)' : 'scale(0.8) rotate(-90deg)',
@@ -168,8 +180,6 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
             transform: getContainerTransform(),
             opacity: isAnimating ? 1 : 0,
             transition: 'all 400ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-            paddingTop: "var(--tg-safe-area-inset-top, 0px)",
-            paddingBottom: "var(--tg-safe-area-inset-bottom, 0px)",
             paddingLeft: "var(--tg-safe-area-inset-left, 0px)",
             paddingRight: "var(--tg-safe-area-inset-right, 0px)",
           }}
