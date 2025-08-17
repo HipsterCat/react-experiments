@@ -22,17 +22,18 @@ const BoxOpeningModal: React.FC = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { isBoxOpeningModalOpen, closeBoxModal, openBoxModal, currentBoxId, initialDisplayMode, boxContents } =
+  const { isBoxOpeningModalOpen, closeBoxModal, currentBoxId, viewMode, boxContents, switchToWheel, switchView } =
     useBoxOpening();
   const { showSnackbar } = useSnackbar();
 
   const [showTopupConfetti, setShowTopupConfetti] = useState(false);
   const [wheelSpinState, setWheelSpinState] = useState<WheelSpinState>("IDLE");
-  const [showYouveGot, setShowYouveGot] = useState(false);
 
   const [isRewardLoading, setRewardLoading] = useState(false);
   const [actualReward, setActualReward] =
     useState<ServiceBoxOpenResponse | null>(null);
+  const [isSwitchingToWheel, setIsSwitchingToWheel] = useState(false);
+  const [hasSpun, setHasSpun] = useState(false);
 
   const handleTopupSuccess = () => {
     setShowTopupConfetti(true);
@@ -43,71 +44,62 @@ const BoxOpeningModal: React.FC = () => {
 
   useEffect(() => {
     if (currentBoxId !== undefined) {
-      console.log('useEffect', currentBoxId, 'initialDisplayMode:', initialDisplayMode, 'isOpen:', isBoxOpeningModalOpen);
-      
-      // Reset state for new box
+      console.log('on box change', currentBoxId, 'viewMode:', viewMode);
+      // Reset state for a new box only
       setActualReward(null);
       setRewardLoading(false);
       setShowTopupConfetti(false);
-      
-      if (initialDisplayMode === 'result') {
-        // Show "you've got" screen immediately for demo mode
-        console.log('useEffect setWheelSpinState STOPPED (result mode)');
-        setWheelSpinState("STOPPED");
-        setShowYouveGot(true);
-        // Create a mock reward for the demo
-        setActualReward({
-          reward_type: "box",
-          reward_value: 0,
-        });
-      } else {
-        // Normal wheel mode - box contents should already be loaded from context
-        console.log('useEffect setWheelSpinState IDLE (wheel mode)');
-        setWheelSpinState("IDLE");
-        setShowYouveGot(false);
-        
-        // Check if we have an error loading box contents
-        if (boxContents.error) {
-          showSnackbar(boxContents.error, { type: "error" });
-          closeBoxModal();
-        }
+      setHasSpun(false);
+      setWheelSpinState(viewMode === 'wheel' ? 'IDLE' : 'STOPPED');
+
+      // Check if we have an error loading box contents
+      if (boxContents.error) {
+        showSnackbar(boxContents.error, { type: "error" });
+        closeBoxModal();
       }
     } else {
       // Reset all state when modal closes
-      console.log('useEffect: modal closed, resetting state');
+      console.log('modal closed, resetting state');
       setActualReward(null);
       setWheelSpinState("IDLE");
-      setShowYouveGot(false);
       setRewardLoading(false);
       setShowTopupConfetti(false);
+      setHasSpun(false);
     }
-  }, [currentBoxId, initialDisplayMode, boxContents.error]);
+  }, [currentBoxId, boxContents.error]);
+
+  // Respond to view changes without nuking reward state
+  useEffect(() => {
+    if (currentBoxId === undefined) return;
+    if (viewMode === 'wheel') {
+      setWheelSpinState('IDLE');
+    } else if (viewMode === 'result') {
+      // nothing; result rendering depends on actualReward
+    }
+  }, [viewMode, currentBoxId]);
 
   useEffect(() => {
-    if (actualReward && wheelSpinState === "STOPPED" && initialDisplayMode === 'wheel') {
-      console.log('useEffect IF ACTUAL REWARD', actualReward, wheelSpinState);
-      // Show "you've got" screen after wheel stops (only in wheel mode)
-      setTimeout(() => {
-        setShowYouveGot(true);
-        if (actualReward.reward_type === "box") {
-          handleTopupSuccess();
-        }
-      }, 500);
+    if (hasSpun && wheelSpinState === "STOPPED" && viewMode === 'wheel') {
+      console.log('wheel stopped -> switching to result');
+      switchView('result');
+      if (actualReward?.reward_type === 'box') {
+        handleTopupSuccess();
+      }
     }
-  }, [actualReward, wheelSpinState, initialDisplayMode]);
+  }, [hasSpun, wheelSpinState, viewMode, actualReward]);
 
-  // Trigger confetti for result mode
+  // Trigger confetti if we land on result with a box after a real spin
   useEffect(() => {
-    if (initialDisplayMode === 'result' && showYouveGot && actualReward?.reward_type === "box") {
+    if (hasSpun && viewMode === 'result' && actualReward?.reward_type === "box") {
       handleTopupSuccess();
     }
-  }, [initialDisplayMode, showYouveGot, actualReward]);
+  }, [viewMode, actualReward, hasSpun]);
 
 
 
   const startSpinning = async () => {
     try {
-      if (currentBoxId === undefined || isRewardLoading) return;
+      if (currentBoxId === undefined || isRewardLoading || hasSpun) return;
 
       setRewardLoading(true);
 
@@ -118,6 +110,7 @@ const BoxOpeningModal: React.FC = () => {
       console.log('startSpinning setWheelSpinState SPINNING', data);
       setWheelSpinState("SPINNING");
       setRewardLoading(false);
+      setHasSpun(true);
 
     } catch (error) {
       console.error(error);
@@ -134,19 +127,29 @@ const BoxOpeningModal: React.FC = () => {
     dispatch(fetchProfile()); 
   };
 
-  const handleOpenNow = () => {
-    if (actualReward) {
-      console.log('handleOpenNow', actualReward);
-      const match = actualReward.extra?.match(/:(\d+)/);
-      if (match) {
-        console.log('handleOpenNow', match[1]);
-        openBoxModal(Number(match[1]));
-      }
-    } else {
-      console.log('handleOpenNow closeBoxModal');
+  const handleOpenNow = async () => {
+    // No nesting: switch current modal from result to wheel for the same box
+    if (currentBoxId === undefined) {
+      console.log('handleOpenNow: no currentBoxId, closing');
       closeBoxModal();
       dispatch(fetchTasks());
       dispatch(fetchProfile());
+      return;
+    }
+
+    if (isSwitchingToWheel || boxContents.isLoading) {
+      console.log('handleOpenNow: already switching/loading, ignoring');
+      return;
+    }
+
+    try {
+      setIsSwitchingToWheel(true);
+      await switchToWheel(currentBoxId);
+    } catch (error) {
+      console.error('handleOpenNow failed to switch to wheel:', error);
+      showSnackbar('Failed to load box contents', { type: 'error' });
+    } finally {
+      setIsSwitchingToWheel(false);
     }
   };
 
@@ -158,33 +161,36 @@ const BoxOpeningModal: React.FC = () => {
   };
 
 
-  const isBoxBlackhole = actualReward
-    ? actualReward.reward_type === "box"
-    : false;
+  // What to display in the result view: real reward after spin, or a placeholder box before spin
+  const displayReward = (viewMode === 'result' && !hasSpun)
+    ? { reward_type: 'box', reward_value: 0 } as ServiceBoxOpenResponse
+    : actualReward;
+
+  const isBox = displayReward ? displayReward.reward_type === "box" : false;
 
   const getBg = () => {
     if (
-      actualReward &&
-      actualReward.reward_type === "box" &&
-      actualReward.reward_value === 12
+      displayReward &&
+      displayReward.reward_type === "box" &&
+      displayReward.reward_value === 12
     ) {
       return {
         backgroundImage: `linear-gradient(rgba(126, 255, 243, 0.5), rgba(103, 162, 255, 0.5)), url(${boxOpenBg})`,
       };
     }
     if (
-      actualReward &&
-      actualReward.reward_type === "box" &&
-      actualReward.reward_value === 13
+      displayReward &&
+      displayReward.reward_type === "box" &&
+      displayReward.reward_value === 13
     ) {
       return {
         backgroundImage: `linear-gradient(rgba(238, 206, 243, 0.5), rgba(213, 86, 255, 0.5)), url(${boxOpenBg})`,
       };
     }
     if (
-      actualReward &&
-      actualReward.reward_type === "box" &&
-      actualReward.reward_value === 14
+      displayReward &&
+      displayReward.reward_type === "box" &&
+      displayReward.reward_value === 14
     ) {
       return {
         backgroundImage: `linear-gradient(rgba(239, 255, 151, 0.5), rgba(255, 206, 133, 0.5)), url(${boxOpenBg})`,
@@ -208,14 +214,14 @@ const BoxOpeningModal: React.FC = () => {
       
       {/* Main Content Area */}
       <div className="flex-1 relative overflow-hidden">
-        {boxContents.isLoading && !showYouveGot ? (
+        {boxContents.isLoading && viewMode === 'wheel' ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
           </div>
         ) : (
           <>
             {/* Wheel State - Show when not in "you've got" mode */}
-            {!showYouveGot && wheelSpinState !== "STOPPED" && (
+            {viewMode === 'wheel' && wheelSpinState !== "STOPPED" && (
               <div 
                 className="absolute inset-0"
                 style={{
@@ -235,23 +241,23 @@ const BoxOpeningModal: React.FC = () => {
             )}
 
             {/* "You've Got" State - Show after wheel stops or in result mode */}
-            {showYouveGot && actualReward && (
+            {viewMode === 'result' && displayReward && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div 
                   className="text-center flex flex-col items-center"
                   style={{
-                    transform: (showYouveGot && isBoxOpeningModalOpen) ? 'scale(1) translateY(0)' : 'scale(0.9) translateY(30px)',
-                    opacity: (showYouveGot && isBoxOpeningModalOpen) ? 1 : 0,
+                    transform: (isBoxOpeningModalOpen) ? 'scale(1) translateY(0)' : 'scale(0.9) translateY(30px)',
+                    opacity: (isBoxOpeningModalOpen) ? 1 : 0,
                     transition: 'all 600ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-                    transitionDelay: (showYouveGot && isBoxOpeningModalOpen) ? '200ms' : '0ms'
+                    transitionDelay: (isBoxOpeningModalOpen) ? '200ms' : '0ms'
                   }}
                 >
                   <div
                     style={{
-                      transform: (showYouveGot && isBoxOpeningModalOpen) ? 'scale(1) translateY(0)' : 'scale(0.9) translateY(20px)',
-                      opacity: (showYouveGot && isBoxOpeningModalOpen) ? 1 : 0,
+                      transform: (isBoxOpeningModalOpen) ? 'scale(1) translateY(0)' : 'scale(0.9) translateY(20px)',
+                      opacity: (isBoxOpeningModalOpen) ? 1 : 0,
                       transition: 'all 500ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-                      transitionDelay: (showYouveGot && isBoxOpeningModalOpen) ? '300ms' : '0ms'
+                      transitionDelay: (isBoxOpeningModalOpen) ? '300ms' : '0ms'
                     }}
                   >
                     <Title
@@ -269,20 +275,20 @@ const BoxOpeningModal: React.FC = () => {
 
                   <div
                     className="relative"
-                    style={{ width: isBoxBlackhole ? 154 : 220, height: isBoxBlackhole ? 154 : 220 }}
+                    style={{ width: isBox ? 154 : 220, height: isBox ? 154 : 220 }}
                   >
                     {/* Rotating Star Animation for boxes */}
-                    {isBoxBlackhole && (
+                    {isBox && (
                       <div 
                         className="absolute left-1/2 top-1/2 pointer-events-none"
                         style={{ 
                           width: '600px',
                           height: '600px',
                           zIndex: -1,
-                          transform: (showYouveGot && isBoxOpeningModalOpen) ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.8)',
-                          opacity: (showYouveGot && isBoxOpeningModalOpen) ? 0.6 : 0,
+                          transform: (isBoxOpeningModalOpen) ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.8)',
+                          opacity: (isBoxOpeningModalOpen) ? 0.6 : 0,
                           transition: 'all 800ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-                          transitionDelay: (showYouveGot && isBoxOpeningModalOpen) ? '400ms' : '0ms'
+                          transitionDelay: (isBoxOpeningModalOpen) ? '400ms' : '0ms'
                         }}
                       >
                         <img 
@@ -298,14 +304,14 @@ const BoxOpeningModal: React.FC = () => {
                     
                     <div
                       style={{
-                        transform: (showYouveGot && isBoxOpeningModalOpen) ? 'scale(1) rotate(0deg)' : 'scale(0.7) rotate(-10deg)',
-                        opacity: (showYouveGot && isBoxOpeningModalOpen) ? 1 : 0,
+                        transform: (isBoxOpeningModalOpen) ? 'scale(1) rotate(0deg)' : 'scale(0.7) rotate(-10deg)',
+                        opacity: (isBoxOpeningModalOpen) ? 1 : 0,
                         transition: 'all 700ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-                        transitionDelay: (showYouveGot && isBoxOpeningModalOpen) ? '500ms' : '0ms'
+                        transitionDelay: (isBoxOpeningModalOpen) ? '500ms' : '0ms'
                       }}
                     >
                       <RewardTypeImage
-                        reward={actualReward}
+                        reward={displayReward}
                         className="w-full h-full"
                         badgeSize="m"
                       />
@@ -319,19 +325,19 @@ const BoxOpeningModal: React.FC = () => {
       </div>
 
       {/* Footer with buttons */}
-      {!boxContents.isLoading && !showYouveGot && (
+      {(
         <div className="relative z-[999] px-4 pb-4">
           <div 
             className="flex flex-col items-center gap-3"
             style={{
-              transform: ((showYouveGot || wheelSpinState === "IDLE") && isBoxOpeningModalOpen) ? 'translateY(0)' : 'translateY(50px)',
-              opacity: ((showYouveGot || wheelSpinState === "IDLE") && isBoxOpeningModalOpen) ? 1 : 0,
+              transform: ((viewMode === 'result' || wheelSpinState === "IDLE") && isBoxOpeningModalOpen) ? 'translateY(0)' : 'translateY(50px)',
+              opacity: ((viewMode === 'result' || wheelSpinState === "IDLE") && isBoxOpeningModalOpen) ? 1 : 0,
               transition: 'all 500ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-              transitionDelay: (showYouveGot && isBoxOpeningModalOpen) ? '600ms' : '200ms'
+              transitionDelay: (viewMode === 'result' && isBoxOpeningModalOpen) ? '600ms' : '200ms'
             }}
           >
             {/* Show different buttons based on state */}
-            {!showYouveGot && wheelSpinState === "IDLE" && (
+            {viewMode === 'wheel' && wheelSpinState === "IDLE" && (
               <Button
                 size="s"
                 stretched={true}
@@ -356,10 +362,10 @@ const BoxOpeningModal: React.FC = () => {
               </Button>
             )}
 
-            {/* "You've Got" screen buttons */}
-            {showYouveGot && actualReward && (
+            {/* Result screen buttons */}
+            {viewMode === 'result' && displayReward && (
               <>
-                {isBoxBlackhole ? (
+                {isBox ? (
                   <>
                     <Text
                       weight="2"
@@ -413,22 +419,25 @@ const BoxOpeningModal: React.FC = () => {
                       stretched={true}
                       mode={"filled"}
                       onClick={handleOpenNow}
+                      loading={isSwitchingToWheel || boxContents.isLoading}
                       style={{
                         borderRadius: 20,
                         height: 42,
                         background:
-                          actualReward.reward_value === 12
+                          displayReward.reward_value === 12
                             ? "rgba(0, 201, 255, 1)"
-                            : actualReward.reward_value === 13
+                            : displayReward.reward_value === 13
                             ? "rgba(112, 0, 203, 1)"
-                            : actualReward.reward_value === 14
+                            : displayReward.reward_value === 14
                             ? "rgba(255, 119, 0, 1)"
                             : "rgba(0, 201, 255, 1)",
                         transform: 'scale(1)',
                         transition: 'transform 200ms ease',
                       }}
                       onMouseDown={(e) => {
-                        e.currentTarget.style.transform = 'scale(0.95)';
+                        if (!(isSwitchingToWheel || boxContents.isLoading)) {
+                          e.currentTarget.style.transform = 'scale(0.95)';
+                        }
                       }}
                       onMouseUp={(e) => {
                         e.currentTarget.style.transform = 'scale(1)';
@@ -444,7 +453,7 @@ const BoxOpeningModal: React.FC = () => {
                           lineHeight: "20px",
                         }}
                       >
-                        {t("box_open.button_open_now")}
+                        {isSwitchingToWheel || boxContents.isLoading ? 'Loading Box...' : t("box_open.button_open_now")}
                       </Text>
                     </Button>
                   </>

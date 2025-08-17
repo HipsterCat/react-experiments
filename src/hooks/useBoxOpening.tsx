@@ -2,7 +2,7 @@ import { type FC, type ReactNode, createContext, useContext, useState, useCallba
 import { getBoxContents } from '../services/mockBoxService';
 import { PrizeItem } from '../types/rewards';
 
-type InitialDisplayMode = 'wheel' | 'result';
+type DisplayMode = 'wheel' | 'result';
 
 interface BoxContentsState {
   prizes: PrizeItem[];
@@ -13,11 +13,13 @@ interface BoxContentsState {
 interface BoxOpeningContextType {
   isBoxOpeningModalOpen: boolean;
   currentBoxId: number | undefined;
-  initialDisplayMode: InitialDisplayMode;
+  viewMode: DisplayMode;
   boxContents: BoxContentsState;
-  openBoxModal: (boxId: number, mode?: InitialDisplayMode) => void;
+  openBoxModal: (boxId: number, mode?: DisplayMode) => void;
   closeBoxModal: () => void;
   loadBoxContents: (boxId: number) => Promise<void>;
+  switchToWheel: (boxId: number) => Promise<void>;
+  switchView: (mode: DisplayMode) => void;
 }
 
 const BoxOpeningContext = createContext<BoxOpeningContextType | undefined>(undefined);
@@ -25,7 +27,7 @@ const BoxOpeningContext = createContext<BoxOpeningContextType | undefined>(undef
 export const BoxOpeningProvider: FC<{ children: ReactNode }> = ({ children }) => {
   console.log('BoxOpeningProvider');
   const [currentBoxId, setCurrentBoxId] = useState<number | undefined>(undefined);
-  const [initialDisplayMode, setInitialDisplayMode] = useState<InitialDisplayMode>('wheel');
+  const [viewMode, setViewMode] = useState<DisplayMode>('wheel');
   const [boxContents, setBoxContents] = useState<BoxContentsState>({
     prizes: [],
     isLoading: false,
@@ -33,22 +35,23 @@ export const BoxOpeningProvider: FC<{ children: ReactNode }> = ({ children }) =>
   });
   const isOpeningRef = useRef(false);
 
-  const openBoxModal = useCallback((boxId: number, mode: InitialDisplayMode = 'wheel') => {
-    console.log('openBoxModal', boxId, 'mode:', mode, 'currentBoxId:', currentBoxId, 'isOpening:', isOpeningRef.current);
+  const openBoxModal = useCallback((boxId: number, viewMode: DisplayMode = 'wheel') => {
     
-    // Prevent opening if modal is already open with the same box or currently opening
-    if (currentBoxId === boxId || isOpeningRef.current) {
+    // Prevent opening additional one if box modal already presented
+    if (isOpeningRef.current) {
       console.log('Modal already open/opening for this box, ignoring');
       return;
     }
     
     isOpeningRef.current = true;
     setCurrentBoxId(boxId);
-    setInitialDisplayMode(mode);
+    setViewMode(viewMode);
     
+    console.log('openBoxModal boxId', boxId, 'mode:', viewMode, 'currentBoxId:', currentBoxId, 'isOpening:', isOpeningRef.current);
     // Reset the opening flag after a short delay
     setTimeout(() => {
       isOpeningRef.current = false;
+      console.log('openBoxModal isOpeningRef.current = false after 100ms');
     }, 100);
   }, [currentBoxId]);
 
@@ -56,7 +59,8 @@ export const BoxOpeningProvider: FC<{ children: ReactNode }> = ({ children }) =>
     console.log('closeBoxModal');
     isOpeningRef.current = false;
     setCurrentBoxId(undefined);
-    setInitialDisplayMode('wheel');
+    console.log('closeBoxModal setCurrentBoxId(undefined)');
+    setViewMode('wheel');
     // Clear box contents when closing
     setBoxContents({
       prizes: [],
@@ -110,11 +114,18 @@ export const BoxOpeningProvider: FC<{ children: ReactNode }> = ({ children }) =>
   const value = {
     isBoxOpeningModalOpen: currentBoxId !== undefined,
     currentBoxId,
-    initialDisplayMode,
+    viewMode,
     boxContents,
     openBoxModal,
     closeBoxModal,
     loadBoxContents,
+    switchToWheel: useCallback(async (boxId: number) => {
+      await loadBoxContents(boxId);
+      setViewMode('wheel');
+    }, [loadBoxContents]),
+    switchView: useCallback((mode: DisplayMode) => {
+      setViewMode(mode);
+    }, []),
   };
 
   return (
