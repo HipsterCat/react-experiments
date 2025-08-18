@@ -37,6 +37,10 @@ const InventoryChangeToastDemo: React.FC = () => {
       otherItems,
       totalCount: otherItems.length + 1,
       fromCoordinates: { x: centerX, y: centerY },
+      onClick: () => {
+        console.log('Toast clicked! Opening inventory...');
+        alert('Opening inventory view...');
+      }
     });
     
     // Animate the clicked item
@@ -89,14 +93,19 @@ const InventoryChangeToastDemo: React.FC = () => {
         <div className="mt-8 bg-white/60 backdrop-blur-sm rounded-xl p-4">
           <h3 className="font-semibold text-gray-700 mb-2">Animation Sequence:</h3>
           <ol className="list-decimal list-inside text-sm text-gray-600 space-y-1">
-            <li>Toast appears as a circle in the top center</li>
-            <li>Clicked item flies from its position to the toast</li>
-            <li>As the item approaches, other inventory items start appearing</li>
-            <li>Toast expands to show the inventory preview (max 6 items + counter)</li>
-            <li>Preview items animate down and fade out</li>
-            <li>Success message slides in from the top</li>
-            <li>After 4 seconds, toast collapses back to circle and fades out</li>
+            <li>Toast appears as a white circle with subtle shadow</li>
+            <li>Clicked item flies and rotates to the toast</li>
+            <li>Icon smoothly fades in as the flying item arrives</li>
+            <li>All box items appear and collapse from right to left, keeping only 3</li>
+            <li>Success label slides in from left with scale animation (1.3 → 1.0)</li>
+            <li>Counter badge appears in bottom corner of the stack</li>
+            <li>Toast is clickable with chevron indicator on the right</li>
+            <li>After 4 seconds, everything collapses back to circle and fades out</li>
           </ol>
+          <div className="mt-2 text-xs text-gray-500">
+            <p>• Only box items are shown in the inventory preview</p>
+            <p>• Click the toast to simulate opening the full inventory</p>
+          </div>
         </div>
       </div>
       
