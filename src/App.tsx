@@ -2,6 +2,7 @@ import BoxOpeningModal from './components/BoxOpeningModal'
 import BalanceAnimation from './components/BalanceAnimation'
 import BoxOpeningDemo from './components/BoxOpeningDemo'
 import LeaderboardOvertakeDemo from './components/LeaderboardOvertakeDemo'
+import InventoryChangeToastDemo from './components/InventoryChangeToastDemo'
 import { AppRoot } from '@telegram-apps/telegram-ui'
 import { BoxOpeningProvider } from './hooks/useBoxOpening'
 import { BalanceAnimationProvider, useBalanceAnimation } from './hooks/useBalanceAnimation'
@@ -14,7 +15,8 @@ function App() {
         <BalanceAnimationProvider>
           <BoxOpeningProvider>
             {/* <BoxOpeningDemo /> */}
-            <LeaderboardOvertakeDemo />
+            {/* <LeaderboardOvertakeDemo /> */}
+            <InventoryChangeToastDemo />
             {/* <EventStackDemo /> */}
             <BoxOpeningModal />
             

@@ -33,6 +33,7 @@ export const useLeaderboardAnimation = ({
   const [displayScore, setDisplayScore] = useState(initialScore);
   const [overtakenUsers, setOvertakenUsers] = useState<LeaderboardUser[]>([]);
   const [visibleOvertakenCount, setVisibleOvertakenCount] = useState(0);
+  const [nearbyAtTarget, setNearbyAtTarget] = useState<LeaderboardUser[]>([]);
   
   const animationTimeoutRef = useRef<number>();
   const targetRankRef = useRef<number>(initialRank);
@@ -123,6 +124,12 @@ export const useLeaderboardAnimation = ({
     // Generate overtaken users
     const overtaken = generateOvertakenUsers(oldRank, newRank, update.nearbyUsers);
     setOvertakenUsers(overtaken);
+    // Keep real/skeleton users near the target rank present during the whole animation
+    setNearbyAtTarget(
+      update.nearbyUsers
+        .filter(u => Math.abs(u.rank - newRank) <= 15)
+        .sort((a, b) => a.rank - b.rank)
+    );
     
     // Phase 1: Expand and show overtaken users (0.3s)
     setState(prev => ({ ...prev, animationPhase: 'expanding' }));
@@ -167,6 +174,7 @@ export const useLeaderboardAnimation = ({
     
     setOvertakenUsers([]);
     setVisibleOvertakenCount(0);
+    setNearbyAtTarget([]);
   }, [state.currentUser.score, generateOvertakenUsers, animateCounter]);
 
   // Handle score increase
@@ -178,7 +186,8 @@ export const useLeaderboardAnimation = ({
     const baseOvertaken = Math.floor(amount * 5); // Many more positions per point
     const randomMultiplier = 2 + Math.random() * 8; // 2x to 10x multiplier
     const overtakenCount = Math.floor(baseOvertaken * randomMultiplier);
-    const newRank = Math.max(1, state.currentUser.rank - overtakenCount);
+    // Never overtake into top-3 in demo to avoid impossible states during animation
+    const newRank = Math.max(4, state.currentUser.rank - overtakenCount);
 
     targetRankRef.current = newRank;
     targetScoreRef.current = newScore;
@@ -215,6 +224,7 @@ export const useLeaderboardAnimation = ({
   const getVisibleUsers = useCallback((): {
     topLeaders: LeaderboardUser[];
     overtaken: LeaderboardUser[];
+    nearbyTarget: LeaderboardUser[];
     userRank: number;
     userScore: number;
   } => {
@@ -234,10 +244,11 @@ export const useLeaderboardAnimation = ({
     return {
       topLeaders,
       overtaken: visibleOvertaken,
+      nearbyTarget: nearbyAtTarget,
       userRank: displayRank,
       userScore: displayScore
     };
-  }, [state, overtakenUsers, visibleOvertakenCount, displayRank, displayScore]);
+  }, [state, overtakenUsers, visibleOvertakenCount, nearbyAtTarget, displayRank, displayScore]);
 
   // Initialize with mock data
   useEffect(() => {

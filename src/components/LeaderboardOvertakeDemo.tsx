@@ -27,7 +27,7 @@ const LeaderboardOvertakeDemo: React.FC = () => {
     }
   };
 
-  const { topLeaders, overtaken, userRank, userScore } = getVisibleUsers();
+  const { topLeaders, overtaken, nearbyTarget, userRank, userScore } = getVisibleUsers();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-8">
@@ -126,6 +126,7 @@ const LeaderboardOvertakeDemo: React.FC = () => {
               <LeaderboardOvertake
                 topLeaders={topLeaders}
                 overtakenUsers={overtaken}
+                nearbyUsers={nearbyTarget}
                 currentUser={{
                   ...state.currentUser,
                   displayRank: userRank,
