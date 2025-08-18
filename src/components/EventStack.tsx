@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EventStackItem, EventStackProps, EVENT_STACK_CONFIG } from '../types/eventStack';
+import { EventStackProps, EVENT_STACK_CONFIG } from '../types/eventStack';
 
 const EventStack: React.FC<EventStackProps> = ({
   events,
@@ -38,6 +38,63 @@ const EventStack: React.FC<EventStackProps> = ({
   const rowStride = (itemHeight + gap);
   const bottomSpawnY = maxVisibleItems * rowStride + itemHeight; // always below full stack
 
+  // Handle initial sequential fill
+  const [initialVisibleCount, setInitialVisibleCount] = useState(0);
+  const hasCompletedInitialRef = useRef(false);
+
+  useEffect(() => {
+    if (!sequentialOnMount) return;
+    if (hasCompletedInitialRef.current) return;
+    if (events.length === 0) return;
+
+    const target = Math.min(maxVisibleItems, events.length);
+    setInitialVisibleCount(0);
+    let cancelled = false;
+
+    try {
+      // eslint-disable-next-line no-console
+      console.debug('[EventStack] initial fill start', { target });
+    } catch {}
+
+    const stepOnce = (nextCount: number) => {
+      if (cancelled) return;
+      setInitialVisibleCount(nextCount);
+      if (nextCount >= target) {
+        hasCompletedInitialRef.current = true;
+        try {
+          // eslint-disable-next-line no-console
+          console.debug('[EventStack] initial fill done');
+        } catch {}
+        return;
+      }
+      setTimeout(() => stepOnce(nextCount + 1), 120);
+    };
+
+    stepOnce(1);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sequentialOnMount, events.length, maxVisibleItems]);
+
+  const sliceCount = sequentialOnMount && !hasCompletedInitialRef.current
+    ? Math.min(initialVisibleCount, maxVisibleItems, events.length)
+    : Math.min(maxVisibleItems, events.length);
+
+  // Compute visible items once and log render state
+  const visibleEvents = events.slice(-sliceCount);
+
+  try {
+    // Lightweight render log
+    // eslint-disable-next-line no-console
+    console.debug('[EventStack] render', {
+      total: events.length,
+      maxVisibleItems,
+      visibleCount: visibleEvents.length,
+      visibleIds: visibleEvents.map((e) => e.id),
+    });
+  } catch {}
+
   return (
     <motion.div
       className={`relative overflow-visible ${className}`}
@@ -56,12 +113,16 @@ const EventStack: React.FC<EventStackProps> = ({
       )}
       <div className="relative">
         <AnimatePresence mode="sync">
-          {(sequentialOnMount ? events.slice(-maxVisibleItems).map((e, i, arr) => arr[i]) : events.slice(-maxVisibleItems)).map((event, index) => {
+          {visibleEvents.map((event, index) => {
             // index is within the visible slice; compute its y
             const targetY = index * rowStride;
+            try {
+              // eslint-disable-next-line no-console
+              console.debug('[EventStack] item', { id: event.id, index, targetY });
+            } catch {}
             return (
               <motion.div
-                key={`${event.id}-${index}`}
+                key={event.id}
                 className="absolute w-full"
                 initial={{ opacity: 0, scale: 0.95, y: bottomSpawnY }}
                 animate={{ opacity: visible ? 1 : 0, scale: 1, y: targetY }}

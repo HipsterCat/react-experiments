@@ -69,21 +69,43 @@ const EventStackDemo: React.FC = () => {
       timestamp: new Date(),
       image: '/src/assets/boxes/rewards/question.webp',
     };
-    setEvents(prev => [newEvent, ...prev]);
+    try {
+      // eslint-disable-next-line no-console
+      console.debug('[EventStackDemo] addNewEvent', { id: newEvent.id });
+    } catch {}
+    setEvents(prev => [...prev, newEvent]);
   };
 
   const clearEvents = () => {
+    try {
+      // eslint-disable-next-line no-console
+      console.debug('[EventStackDemo] clearEvents');
+    } catch {}
     setEvents([]);
   };
 
   const resetEvents = () => {
+    try {
+      // eslint-disable-next-line no-console
+      console.debug('[EventStackDemo] resetEvents');
+    } catch {}
     setEvents(sampleEvents);
   };
 
-  const handleEventClick = (event: EventStackItem) => {
-    console.log('Event clicked:', event);
-    alert(`Clicked: ${event.title}`);
-  };
+  // const handleEventClick = (event: EventStackItem) => {
+  //   console.log('Event clicked:', event);
+  //   alert(`Clicked: ${event.title}`);
+  // };
+
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line no-console
+      console.debug('[EventStackDemo] events updated', {
+        length: events.length,
+        ids: events.map((e) => e.id),
+      });
+    } catch {}
+  }, [events]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-8">
@@ -160,6 +182,7 @@ const EventStackDemo: React.FC = () => {
                   width={130}
                   events={events}
                   maxVisibleItems={3}
+                  sequentialOnMount
                 />
               </div>
             </div>

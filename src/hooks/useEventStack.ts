@@ -9,6 +9,10 @@ export const useEventStack = (shouldLoad: boolean = false) => {
   const hasStartedLoadingRef = useRef(false);
 
   const addEvent = useCallback((event: EventStackItem) => {
+    try {
+      // eslint-disable-next-line no-console
+      console.debug('[useEventStack] addEvent', { id: event.id });
+    } catch {}
     setEvents(prev => [...prev, event]); // Append to end so it appears at bottom
   }, []);
 
@@ -27,6 +31,10 @@ export const useEventStack = (shouldLoad: boolean = false) => {
     setEvents([]); // Clear existing events
     
     try {
+      try {
+        // eslint-disable-next-line no-console
+        console.debug('[useEventStack] startLoading', { total: 15 });
+      } catch {}
       await loadEventsGradually(
         addEvent,
         15, // Total events to load
@@ -34,9 +42,15 @@ export const useEventStack = (shouldLoad: boolean = false) => {
         3000, // Interval between events (3 seconds to match stack rotation)
         abortRef.current.signal
       );
-    } catch (error) {
-      if (error?.name !== 'AbortError') {
+    } catch (error: unknown) {
+      const err = error as { name?: string };
+      if (err?.name !== 'AbortError') {
         console.error('Failed to load events:', error);
+      } else {
+        try {
+          // eslint-disable-next-line no-console
+          console.debug('[useEventStack] aborted');
+        } catch {}
       }
     } finally {
       setIsLoading(false);
@@ -45,6 +59,10 @@ export const useEventStack = (shouldLoad: boolean = false) => {
   }, [addEvent, isLoading]);
 
   const clearEvents = useCallback(() => {
+    try {
+      // eslint-disable-next-line no-console
+      console.debug('[useEventStack] clearEvents');
+    } catch {}
     setEvents([]);
     hasStartedLoadingRef.current = false;
   }, []);
@@ -61,6 +79,10 @@ export const useEventStack = (shouldLoad: boolean = false) => {
     return () => {
       // Cleanup any in-flight timers/requests
       if (abortRef.current) {
+        try {
+          // eslint-disable-next-line no-console
+          console.debug('[useEventStack] cleanup abort');
+        } catch {}
         abortRef.current.abort();
         abortRef.current = null;
       }

@@ -21,9 +21,22 @@ const InventoryChangeToastDemo: React.FC = () => {
   const [clickedItem, setClickedItem] = useState<string | null>(null);
   
   const handleItemClick = (e: React.MouseEvent<HTMLDivElement>, itemId: string) => {
-    const rect = e.currentTarget.getBoundingClientRect();
+    const container = e.currentTarget;
+    const rect = container.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
+    
+    // Get actual content size (container has p-3 = 12px padding)
+    const paddingSize = 12 * 2; // p-3 on all sides
+    const contentSize = rect.width - paddingSize;
+    
+    console.log('Clicked item:', itemId, {
+      rect,
+      centerX,
+      centerY,
+      containerSize: rect.width,
+      contentSize
+    });
     
     // Get random items for inventory preview
     const mainItem = SAMPLE_ITEMS.find(item => item.id === itemId)!;
@@ -37,6 +50,7 @@ const InventoryChangeToastDemo: React.FC = () => {
       otherItems,
       totalCount: otherItems.length + 1,
       fromCoordinates: { x: centerX, y: centerY },
+      fromSize: { width: contentSize, height: contentSize },
       onClick: () => {
         console.log('Toast clicked! Opening inventory...');
         alert('Opening inventory view...');
@@ -73,6 +87,14 @@ const InventoryChangeToastDemo: React.FC = () => {
                   opacity: clickedItem === item.id ? 0.5 : 1,
                 }}
                 transition={{ duration: 0.3 }}
+                onAnimationStart={() => {
+                  const el = document.querySelector(`[data-item-id="${item.id}"]`);
+                  if (el) {
+                    const imgEl = el.querySelector('img');
+                    console.log(`Item ${item.id} image size:`, imgEl?.getBoundingClientRect());
+                  }
+                }}
+                data-item-id={item.id}
               >
                 <img 
                   src={item.icon} 
