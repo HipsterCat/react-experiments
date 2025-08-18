@@ -17,6 +17,8 @@ import Confetti from "react-confetti";
 import { useAppDispatch } from "../hooks/useBoxOpening";
 import starIcon from "../assets/boxes/star.webp";
 import { motion } from "framer-motion";
+import EventStack from "./EventStack";
+import { useEventStack } from "../hooks/useEventStack";
 
 
 
@@ -93,12 +95,19 @@ const BoxOpeningModal: React.FC = () => {
     }
   }, [viewMode, currentBoxId]);
 
-    // What to display in the result view: real reward after spin, or a placeholder box before spin
-    const displayReward = (viewMode === 'result' && !hasSpun)
+      // What to display in the result view: real reward after spin, or a placeholder box before spin
+  const displayReward = (viewMode === 'result' && !hasSpun)
     ? { reward_type: 'box', reward_value: 11 } as ServiceBoxOpenResponse
     : actualReward;
 
   const isBox = displayReward ? displayReward.reward_type === "box" : false;
+
+  // EventStack for showing recent activity (always mounted, internally animated visibility)
+  // Only show events when in wheel mode and ready to spin, not in result mode
+  const canOpenOrReveal = viewMode === 'wheel' && wheelSpinState === 'IDLE';
+  const showContinue = (viewMode === 'result' && !isBox); // continue button screen
+  // Only load events when modal is actually open and in the right state
+  const { events } = useEventStack(isBoxOpeningModalOpen && canOpenOrReveal);
 
   useEffect(() => {
     // Do not react if modal is closed
@@ -309,7 +318,7 @@ const BoxOpeningModal: React.FC = () => {
                 scale: 1,
               }}
               transition={{ duration: 0.4, ease: "easeInOut" }}
-              style={{ pointerEvents: 'none', zIndex: 1 }}
+              style={{ pointerEvents: viewMode === 'result' ? 'none' : 'auto', zIndex: 1 }}
             >
               <PrizeCarousel
                 key={viewMode}
@@ -394,6 +403,21 @@ const BoxOpeningModal: React.FC = () => {
 
           </>
       </div>
+      {/* EventStack - anchored top-left (adaptive width inside) */}
+      <div className="absolute top-20 left-2">
+        <EventStack
+          events={events}
+          maxVisibleItems={4}
+          visible={!showContinue && canOpenOrReveal}
+          title={'Recent Activity'}
+          width={130}
+          itemHeight={40}
+          gap={6}
+          sequentialOnMount={true}
+          className="pointer-events-auto"
+        />
+      </div>
+
 
         <div className="absolute bottom-0 left-0 right-0 z-[999] px-4 pb-4">
           <motion.div 
@@ -454,10 +478,13 @@ const BoxOpeningModal: React.FC = () => {
                       onClick={handleSaveToInventory}
                       style={{
                         borderRadius: 20,
-                        height: 42,
+                        height: 40,
                         background: "white",
                         transform: 'scale(1)',
                         transition: 'transform 200ms ease',
+                        marginBottom: '6px',
+                        outline: '1px solid rgb(0, 0, 0, 0.15)',
+
                       }}
                       onMouseDown={(e) => {
                         e.currentTarget.style.transform = 'scale(0.95)';
@@ -486,14 +513,14 @@ const BoxOpeningModal: React.FC = () => {
                       </div>
                     </Button>
                     <Button
-                      size="s"
+                      size="m"
                       stretched={true}
                       mode={"filled"}
                       onClick={handleOpenNow}
                       loading={isSwitchingToWheel || boxContents.isLoading}
                       style={{
-                        borderRadius: 20,
-                        height: 42,
+                        borderRadius: 25,
+                        height: 50,
                         background:
                           displayReward.reward_value === 12
                             ? "rgba(0, 201, 255, 1)"
@@ -519,11 +546,8 @@ const BoxOpeningModal: React.FC = () => {
                       }}
                     >
                       <Text
-                        weight="2"
-                        style={{
-                          fontSize: 15,
-                          lineHeight: "20px",
-                        }}
+                        weight="1"
+
                       >
                         {isSwitchingToWheel || boxContents.isLoading ? 'Loading Box...' : t("box_open.button_open_now")}
                       </Text>

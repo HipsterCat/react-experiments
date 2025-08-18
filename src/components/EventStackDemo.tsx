@@ -139,7 +139,7 @@ const EventStackDemo: React.FC = () => {
           {/* Event Stack Demos */}
           <div className="space-y-8">
             {/* Main Demo */}
-            <div className="bg-white rounded-lg p-6 shadow-lg">
+            {/* <div className="bg-white rounded-lg p-6 shadow-lg">
               <h2 className="text-xl font-semibold mb-4">Event Stack with Title</h2>
               <div className="flex justify-center">
                 <EventStack
@@ -149,22 +149,23 @@ const EventStackDemo: React.FC = () => {
                   onEventClick={handleEventClick}
                 />
               </div>
-            </div>
+            </div> */}
 
             {/* Compact Demo */}
             <div className="bg-white rounded-lg p-6 shadow-lg">
               <h2 className="text-xl font-semibold mb-4">Compact Stack (3 items)</h2>
               <div className="flex justify-center">
                 <EventStack
+                  title="Recent Rewards"
+                  width={130}
                   events={events}
                   maxVisibleItems={3}
-                  onEventClick={handleEventClick}
                 />
               </div>
             </div>
 
             {/* Custom Width Demo */}
-            <div className="bg-white rounded-lg p-6 shadow-lg">
+            {/* <div className="bg-white rounded-lg p-6 shadow-lg">
               <h2 className="text-xl font-semibold mb-4">Custom Width (280px)</h2>
               <div className="flex justify-center">
                 <EventStack
@@ -175,7 +176,7 @@ const EventStackDemo: React.FC = () => {
                   onEventClick={handleEventClick}
                 />
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
 

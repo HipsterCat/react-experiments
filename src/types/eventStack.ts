@@ -10,10 +10,13 @@ export interface EventStackItem {
 export interface EventStackProps {
   events: EventStackItem[];
   maxVisibleItems?: number;
-  title?: string;
-  width?: number;
-  onEventClick?: (event: EventStackItem) => void;
   className?: string;
+  visible?: boolean; // Controls fade-in/out left without unmounting
+  title?: string;
+  width?: number; // fixed width provided by parent
+  itemHeight?: number; // fixed item height provided by parent
+  gap?: number; // spacing between items provided by parent
+  sequentialOnMount?: boolean; // if true, fill stack sequentially on first appear
 }
 
 export const EVENT_STACK_CONFIG = {

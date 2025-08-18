@@ -2,6 +2,7 @@ import React, { useEffect, useState, ReactNode } from 'react';
 import { Icon28Close } from "@telegram-apps/telegram-ui/dist/icons/28/close";
 import { useTabbarContext } from "../hooks/useTabbarContext";
 import { motion, AnimatePresence } from "framer-motion";
+import boxOpenBg from "../assets/boxes/boxOpenBg_2.jpg";
 
 interface AnimatedFullscreenProps {
   isOpen: boolean;
@@ -22,7 +23,7 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
   onClose,
   children,
   backgroundImage,
-  backgroundColor = 'rgba(0, 0, 0, 0.9)',
+  backgroundColor = 'rgba(0, 0, 0, 1.0)',
   animationType = 'scale',
   disableTabbarToggle = false,
   showCloseButton = true,
@@ -65,7 +66,7 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
       // Small delay to ensure the element is rendered before animation
       const timer = setTimeout(() => {
         setIsAnimating(true);
-      }, 10);
+      }, 50);
       return () => clearTimeout(timer);
     } else {
       console.log('useEffect isOpen false - setIsAnimating false');
@@ -142,6 +143,7 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
           className="absolute inset-0"
           style={{
             ...getBackgroundStyle(),
+
           }}
           initial={{ opacity: 0 }}
           animate={{ opacity: isAnimating ? 1 : 0 }}
@@ -149,6 +151,7 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
           transition={{ duration: 0.4, ease: 'easeInOut' }}
         />
       </AnimatePresence>
+
       
       {/* Overlay Layer (above background for blend mode) */}
       {overlayImage && (

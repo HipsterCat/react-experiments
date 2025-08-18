@@ -1,6 +1,7 @@
 import BoxOpeningModal from './components/BoxOpeningModal'
 import BalanceAnimation from './components/BalanceAnimation'
-import EventStackDemo from './components/EventStackDemo'
+import BoxOpeningDemo from './components/BoxOpeningDemo'
+import LeaderboardOvertakeDemo from './components/LeaderboardOvertakeDemo'
 import { AppRoot } from '@telegram-apps/telegram-ui'
 import { BoxOpeningProvider } from './hooks/useBoxOpening'
 import { BalanceAnimationProvider, useBalanceAnimation } from './hooks/useBalanceAnimation'
@@ -12,7 +13,9 @@ function App() {
       <NiceToastProvider>
         <BalanceAnimationProvider>
           <BoxOpeningProvider>
-            <EventStackDemo />
+            {/* <BoxOpeningDemo /> */}
+            <LeaderboardOvertakeDemo />
+            {/* <EventStackDemo /> */}
             <BoxOpeningModal />
             
             {/* Balance Animation - positioned above all modals */}

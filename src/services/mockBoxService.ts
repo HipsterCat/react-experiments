@@ -19,8 +19,20 @@ const MOCK_REWARDS: InventoryReward[] = [
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Mock function to get box contents
-export const getBoxContents = async (_boxId: string): Promise<ServiceBoxContentResponse> => {
-  await delay(500); // Simulate network delay
+export const getBoxContents = async (_boxId: string, signal?: AbortSignal): Promise<ServiceBoxContentResponse> => {
+  if (signal?.aborted) {
+    return { rewards: [] };
+  }
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, 500);
+    if (signal) {
+      const onAbort = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
 
   // Filter out some rewards to make it more realistic
   const filteredRewards = MOCK_REWARDS.filter(
@@ -29,7 +41,9 @@ export const getBoxContents = async (_boxId: string): Promise<ServiceBoxContentR
       reward.reward_type !== "telegram_premium"
   );
 
-  console.log('getBoxContents', filteredRewards);
+  if (!signal?.aborted) {
+    console.log('getBoxContents', filteredRewards);
+  }
 
   return {
     rewards: [...filteredRewards, ...filteredRewards] // Duplicate for more variety

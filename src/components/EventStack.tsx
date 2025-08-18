@@ -1,34 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { EventStackItem, EventStackProps, EVENT_STACK_CONFIG } from '../types/eventStack';
 
 const EventStack: React.FC<EventStackProps> = ({
   events,
   maxVisibleItems = EVENT_STACK_CONFIG.DEFAULT_MAX_ITEMS,
-  title,
-  width = EVENT_STACK_CONFIG.DEFAULT_WIDTH,
-  onEventClick,
   className = '',
+  visible = true,
+  title,
+  width,
+  itemHeight = EVENT_STACK_CONFIG.ITEM_HEIGHT,
+  gap = EVENT_STACK_CONFIG.STACK_GAP,
+  sequentialOnMount = false,
 }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  // Auto-rotate events with step approach
-  useEffect(() => {
-    if (events.length <= maxVisibleItems) return;
-
-    const interval = setInterval(() => {
-      setCurrentIndex((prevIndex) => {
-        const nextIndex = prevIndex + 1;
-        // If we've shown all events, start over
-        if (nextIndex >= events.length) {
-          return 0;
-        }
-        return nextIndex;
-      });
-    }, 4000); // 4 seconds total cycle
-
-    return () => clearInterval(interval);
-  }, [events.length, maxVisibleItems]);
+  // Dimensions controlled externally via props
 
   const formatTimestamp = (timestamp: Date): string => {
     const now = new Date();
@@ -36,126 +21,88 @@ const EventStack: React.FC<EventStackProps> = ({
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
+    const weeks = Math.floor(diff / 604800000);
 
-    if (minutes < 1) return 'now';
-    if (minutes < 60) return `${minutes}m`;
-    if (hours < 24) return `${hours}h`;
-    return `${days}d`;
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes} min ago`;
+    if (hours < 2) return `1 hour ago`;
+    if (hours < 24) return `${hours} hours ago`;
+    if (days < 2) return `yesterday`;
+    if (weeks < 4 && weeks > 1) return `${weeks} weeks ago`;
+
+    return `${days} days ago`;
   };
 
-  const handleEventClick = useCallback((event: EventStackItem) => {
-    onEventClick?.(event);
-  }, [onEventClick]);
-
-  // Get visible events based on current index
-  const getVisibleEvents = () => {
-    if (events.length === 0) return [];
-    if (events.length <= maxVisibleItems) return events;
-    
-    const startIndex = currentIndex;
-    const visibleEvents = [];
-    
-    for (let i = 0; i < maxVisibleItems; i++) {
-      const eventIndex = (startIndex + i) % events.length;
-      visibleEvents.push(events[eventIndex]);
-    }
-    
-    return visibleEvents;
-  };
-
-  const visibleEvents = getVisibleEvents();
-
-  const containerHeight = title 
-    ? 30 + EVENT_STACK_CONFIG.STACK_GAP + (maxVisibleItems * (EVENT_STACK_CONFIG.ITEM_HEIGHT + EVENT_STACK_CONFIG.STACK_GAP)) - EVENT_STACK_CONFIG.STACK_GAP
-    : (maxVisibleItems * (EVENT_STACK_CONFIG.ITEM_HEIGHT + EVENT_STACK_CONFIG.STACK_GAP)) - EVENT_STACK_CONFIG.STACK_GAP;
+  // Fixed height equal to maxVisibleItems; children won't change it
+  const fixedHeight = (maxVisibleItems * (itemHeight + gap)) - gap;
+  const rowStride = (itemHeight + gap);
+  const bottomSpawnY = maxVisibleItems * rowStride + itemHeight; // always below full stack
 
   return (
-    <div 
-      className={`relative ${className}`}
-      style={{ 
-        width: `${width}px`,
-        height: `${containerHeight}px`,
+    <motion.div
+      className={`relative overflow-visible ${className}`}
+      style={{
+        width: width !== undefined ? `${width}px` : undefined,
+        height: fixedHeight,
       }}
+      initial={{ opacity: 0, x: -50 }}
+      animate={{ opacity: visible ? 1 : 0, x: visible ? 0 : -50 }}
+      transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
     >
-      {/* Optional title */}
-      {title && (
-        <div className="text-sm font-semibold text-gray-700 mb-1.5 px-2">
+      {title && events.length > 0 && (
+        <div className="text-xs font-semibold text-gray-700 mb-1.5 px-2 select-none">
           {title}
         </div>
       )}
-
-      {/* Event stack */}
       <div className="relative">
-        {visibleEvents.map((event, index) => (
-          <div
-            key={`${event.id}-${index}`}
-            className="absolute w-full"
-            style={{
-              top: `${index * (EVENT_STACK_CONFIG.ITEM_HEIGHT + EVENT_STACK_CONFIG.STACK_GAP)}px`,
-            }}
-          >
-            <motion.div
-              className={`
-                flex items-center cursor-pointer
-                bg-white rounded-[20px] shadow-[0_0_10px_0_rgba(0,0,0,0.20)]
-                transition-all duration-200 hover:shadow-[0_0_15px_0_rgba(0,0,0,0.25)]
-                ${event.className || ''}
-              `}
-              style={{
-                height: `${EVENT_STACK_CONFIG.ITEM_HEIGHT}px`,
-                padding: '6px 6px 6px 10px',
-                gap: '8px',
-              }}
-              onClick={() => handleEventClick(event)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              initial={{ opacity: 0, scale: 0.9, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ 
-                duration: 0.3,
-                delay: index * 0.05,
-                ease: [0.32, 0.72, 0, 1]
-              }}
-            >
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-gray-900 truncate leading-tight">
-                  {event.title}
+        <AnimatePresence mode="sync">
+          {(sequentialOnMount ? events.slice(-maxVisibleItems).map((e, i, arr) => arr[i]) : events.slice(-maxVisibleItems)).map((event, index) => {
+            // index is within the visible slice; compute its y
+            const targetY = index * rowStride;
+            return (
+              <motion.div
+                key={`${event.id}-${index}`}
+                className="absolute w-full"
+                initial={{ opacity: 0, scale: 0.95, y: bottomSpawnY }}
+                animate={{ opacity: visible ? 1 : 0, scale: 1, y: targetY }}
+                exit={{ opacity: 0, scale: 0.9, y: -rowStride }}
+                transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
+              >
+                <div
+                  className={`
+                    flex items-center bg-white rounded-[20px]
+                    shadow-[0_0_10px_0_rgba(0,0,0,0.20)] transition-all duration-200
+                    ${event.className || ''}
+                  `}
+                  style={{
+                    height: `${itemHeight}px`,
+                    padding: '6px 6px 6px 10px',
+                    gap: `${Math.max(0, gap - 2)}px`,
+                  }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-gray-900 truncate leading-tight">
+                      {event.title}
+                    </div>
+                    <div className="text-xs text-gray-400 truncate leading-tight">
+                      {formatTimestamp(event.timestamp)}
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <img
+                      src={event.image}
+                      alt={event.title}
+                      className="object-cover"
+                      style={{ width: itemHeight - 6, height: itemHeight - 6 }}
+                    />
+                  </div>
                 </div>
-                <div className="text-xs text-gray-600 truncate leading-tight">
-                  {formatTimestamp(event.timestamp)}
-                </div>
-              </div>
-
-              {/* Image */}
-              <div className="flex-shrink-0">
-                <img
-                  src={event.image}
-                  alt={event.title}
-                  className="w-7 h-7 rounded-full object-cover"
-                />
-              </div>
-            </motion.div>
-          </div>
-        ))}
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
-
-      {/* Progress indicator (optional) */}
-      {events.length > maxVisibleItems && (
-        <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-1">
-          {Array.from({ length: Math.ceil(events.length / maxVisibleItems) }, (_, i) => (
-            <div
-              key={i}
-              className={`w-1.5 h-1.5 rounded-full transition-colors duration-200 ${
-                Math.floor(currentIndex / maxVisibleItems) === i
-                  ? 'bg-gray-400'
-                  : 'bg-gray-200'
-              }`}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+    </motion.div>
   );
 };
 

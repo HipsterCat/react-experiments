@@ -37,7 +37,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   className = "",
   balanceType: initialBalanceType = 'coins',
   useRollingCounter = false,
-  useNumberFlow = true,
+  useNumberFlow = false,
 }, ref) => {
   // Determine the correct initial balance based on balance type
   // (no longer used directly once we introduced per-type persistent balances)

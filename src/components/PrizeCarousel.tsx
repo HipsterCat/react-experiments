@@ -60,15 +60,15 @@ export const PrizeCarousel = ({
   const pausedSinceRef = useRef<number | null>(null);
   const totalPausedMsRef = useRef<number>(0);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('[PrizeCarousel] State:', {
-      selectedIndex,
-      wheelSpinState,
-      showRevealAnimation,
-      actualReward
-    });
-  }, [selectedIndex, wheelSpinState, showRevealAnimation, actualReward]);
+  // Debug logging - commented out for performance
+  // useEffect(() => {
+  //   console.log('[PrizeCarousel] State:', {
+  //     selectedIndex,
+  //     wheelSpinState,
+  //     showRevealAnimation,
+  //     actualReward
+  //   });
+  // }, [selectedIndex, wheelSpinState, showRevealAnimation, actualReward]);
 
   // Track if the selected reward image finished loading to end reveal precisely
   const [selectedLoaded, setSelectedLoaded] = useState(false);
@@ -338,23 +338,23 @@ export const PrizeCarousel = ({
               ? ((isCenter || isSelected) ? 0 : (isAfter ? 7 : -7))
               : 0;
             
-            // Debug logging for visibility issues
-            if (wheelSpinState === "STOPPED" && isSelected) {
-              console.log(`[PrizeCarousel] STOPPED state - Selected item ${index}:`, {
-                isCenter,
-                isSelected,
-                distance,
-                selectedIndex: normalizedSelectedIndex,
-                wheelSpinState,
-                showRevealAnimation,
-                scaleValue,
-                opacityValue
-              });
-            }
+            // Debug logging for visibility issues - commented out for performance
+            // if (wheelSpinState === "STOPPED" && isSelected) {
+            //   console.log(`[PrizeCarousel] STOPPED state - Selected item ${index}:`, {
+            //     isCenter,
+            //     isSelected,
+            //     distance,
+            //     selectedIndex: normalizedSelectedIndex,
+            //     wheelSpinState,
+            //     showRevealAnimation,
+            //     scaleValue,
+            //     opacityValue
+            //   });
+            // }
             
-            if (scaleValue === 1.0 && opacityValue === 1.0) {
-              console.log("Selected key", `${prize.reward_type}-${prize.reward_value}-${index}`, "isSelected", isSelected, "actualReward", actualReward, "showRevealAnimation", showRevealAnimation, "wheelSpinState", wheelSpinState, "scaleValue", scaleValue, "opacityValue", opacityValue);
-            }
+            // if (scaleValue === 1.0 && opacityValue === 1.0) {
+            //   console.log("Selected key", `${prize.reward_type}-${prize.reward_value}-${index}`, "isSelected", isSelected, "actualReward", actualReward, "showRevealAnimation", showRevealAnimation, "wheelSpinState", wheelSpinState, "scaleValue", scaleValue, "opacityValue", opacityValue);
+            // }
             // Show the provided actualReward for the selected item when either:
             // - we're revealing, or
             // - we're in STOPPED state (e.g., result view placeholder)
@@ -402,7 +402,7 @@ export const PrizeCarousel = ({
         
         // Gap between arrows: 0 by default (middle), increase when spinning
         const gap = wheelSpinState === 'SPINNING' ? '190px' : '10px'; // px gap between arrows
-        console.log("gap", gap, "wheelSpinState", wheelSpinState);
+        // console.log("gap", gap, "wheelSpinState", wheelSpinState);
         return (
        <motion.div 
             className="pointer-events-none absolute inset-0 flex items-center justify-center z-[-2]"
