@@ -67,27 +67,39 @@ export const useEventStack = (shouldLoad: boolean = false) => {
     hasStartedLoadingRef.current = false;
   }, []);
 
-  // Auto-start loading when shouldLoad becomes true
+  // Auto-start loading only when shouldLoad flips to true
   useEffect(() => {
-    if (shouldLoad && events.length === 0 && !isLoading && !hasStartedLoadingRef.current) {
+    if (shouldLoad && !isLoading && !hasStartedLoadingRef.current && events.length === 0) {
       startLoading();
-    } else if (!shouldLoad) {
-      // Reset when shouldLoad becomes false
-      hasStartedLoadingRef.current = false;
     }
-    
-    return () => {
-      // Cleanup any in-flight timers/requests
+    // When shouldLoad becomes false, stop current stream and reset guard
+    if (!shouldLoad) {
       if (abortRef.current) {
         try {
           // eslint-disable-next-line no-console
-          console.debug('[useEventStack] cleanup abort');
+          console.debug('[useEventStack] stop (shouldLoad=false)');
+        } catch {}
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+      hasStartedLoadingRef.current = false;
+    }
+    // Intentionally no cleanup here to avoid aborting on every dependency change
+  }, [shouldLoad, isLoading, startLoading, events.length]);
+
+  // Abort on unmount only
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        try {
+          // eslint-disable-next-line no-console
+          console.debug('[useEventStack] cleanup abort (unmount)');
         } catch {}
         abortRef.current.abort();
         abortRef.current = null;
       }
     };
-  }, [shouldLoad, events.length, isLoading, startLoading]);
+  }, []);
 
   return {
     events,
