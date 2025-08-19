@@ -78,14 +78,14 @@ export const generateMockEvents = async (count: number = 20, signal?: AbortSigna
   try {
     try {
       // eslint-disable-next-line no-console
-      console.debug('[mockEventService] generateMockEvents:start', { count });
+      // console.debug('[mockEventService] generateMockEvents:start', { count });
     } catch {}
     // Get box contents to use as reward templates
     const boxContents = await getBoxContents('mock', signal);
     if (signal?.aborted) {
       try {
         // eslint-disable-next-line no-console
-        console.debug('[mockEventService] generateMockEvents:aborted-before-build');
+        // console.debug('[mockEventService] generateMockEvents:aborted-before-build');
       } catch {}
       return [];
     }
@@ -112,13 +112,13 @@ export const generateMockEvents = async (count: number = 20, signal?: AbortSigna
     // Sort by timestamp (newest first)
     events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     
-    try {
-      // eslint-disable-next-line no-console
-      console.debug('[mockEventService] generateMockEvents:done', {
-        generated: events.length,
-        sampleIds: events.slice(0, 3).map((e) => e.id),
-      });
-    } catch {}
+    // try {
+    //   // eslint-disable-next-line no-console
+    //   console.debug('[mockEventService] generateMockEvents:done', {
+    //     generated: events.length,
+    //     sampleIds: events.slice(0, 3).map((e) => e.id),
+    //   });
+    // } catch {}
 
     return events;
   } catch (error) {
@@ -135,12 +135,14 @@ export const loadEventsGradually = async (
   intervalMs: number = 2000,
   signal?: AbortSignal,
   burstCount: number = 4,
-  burstIntervalMs: number = 120
+  burstIntervalMs: number = 120,
+  intervalMinMs: number = 800,
+  intervalMaxMs: number = 1600
 ): Promise<void> => {
   try {
     try {
       // eslint-disable-next-line no-console
-      console.debug('[mockEventService] loadEventsGradually:start', { totalEvents, initialDelay, intervalMs });
+      // console.debug('[mockEventService] loadEventsGradually:start', { totalEvents, initialDelay, intervalMs });
     } catch {}
     const allEvents = await generateMockEvents(totalEvents, signal);
     if (signal?.aborted) return;
@@ -151,7 +153,7 @@ export const loadEventsGradually = async (
     for (let i = 0; i < initialBurst; i++) {
       if (signal?.aborted) return;
       try {
-        console.debug('[mockEventService] loadEventsGradually:emit(burst)', { index: i, id: allEvents[i].id });
+        // console.debug('[mockEventService] loadEventsGradually:emit(burst)', { index: i, id: allEvents[i].id });
       } catch {}
       onEventLoaded(allEvents[i]);
       if (i < initialBurst - 1) {
@@ -170,16 +172,19 @@ export const loadEventsGradually = async (
       if (signal?.aborted) return;
       try {
         // eslint-disable-next-line no-console
-        console.debug('[mockEventService] loadEventsGradually:emit', { index: i, id: allEvents[i].id });
+        // console.debug('[mockEventService] loadEventsGradually:emit', { index: i, id: allEvents[i].id });
       } catch {}
       onEventLoaded(allEvents[i]);
       if (i < allEvents.length - 1) {
-        await wait(intervalMs, signal);
+        const min = Math.max(0, Math.min(intervalMinMs, intervalMaxMs));
+        const max = Math.max(intervalMinMs, intervalMaxMs);
+        const jitter = min + Math.random() * (max - min);
+        await wait(jitter || intervalMs, signal);
       }
     }
     try {
       // eslint-disable-next-line no-console
-      console.debug('[mockEventService] loadEventsGradually:complete');
+      // console.debug('[mockEventService] loadEventsGradually:complete');
     } catch {}
   } catch (error) {
     console.error('Failed to load events gradually:', error);

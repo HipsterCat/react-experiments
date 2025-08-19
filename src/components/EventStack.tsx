@@ -41,13 +41,20 @@ const EventStack: React.FC<EventStackProps> = ({
   // Local displayed queue for smooth sequencing and rotation
   const [displayedIds, setDisplayedIds] = useState<string[]>([]);
   const hasCompletedInitialRef = useRef(false);
+  const hasStartedInitialRef = useRef(false);
   const timersRef = useRef<number[]>([]);
+  const eventsRef = useRef(events);
+
+  useEffect(() => {
+    eventsRef.current = events;
+  }, [events]);
 
   // Reset sequencing on visibility change
   useEffect(() => {
     timersRef.current.forEach((t) => clearTimeout(t));
     timersRef.current = [];
     if (!visible) return;
+    hasStartedInitialRef.current = false;
     if (!sequentialOnMount) {
       // Immediate fill to last N when not sequencing
       const target = events.slice(-Math.min(maxVisibleItems, events.length)).map(e => e.id);
@@ -55,32 +62,50 @@ const EventStack: React.FC<EventStackProps> = ({
       hasCompletedInitialRef.current = true;
       return;
     }
-    try { console.debug('[EventStack] initial fill start (visible)'); } catch {}
+    // try { console.debug('[EventStack] initial fill start (visible)'); } catch {}
     hasCompletedInitialRef.current = false;
+    hasStartedInitialRef.current = false;
     setDisplayedIds([]);
-    const targetIds = events.slice(-Math.min(maxVisibleItems, events.length)).map(e => e.id);
-    // Start after 600ms, then add one every 500ms
+    // Start after 600ms, then add items one-by-one with random delay (1200-2100ms)
     const startTimer = window.setTimeout(() => {
-      targetIds.forEach((id, i) => {
-        const t = window.setTimeout(() => {
-          setDisplayedIds((prev) => {
-            const next = [...prev, id];
-            if (next.length >= Math.min(maxVisibleItems, targetIds.length)) {
-              hasCompletedInitialRef.current = true;
-              try { console.debug('[EventStack] initial fill done'); } catch {}
-            }
-            return next;
-          });
-        }, i * 500);
+      const step = (index: number) => {
+        if (!visible) return; // stop if hidden
+        // Get current target ids from the last N events
+        const curEvents = eventsRef.current;
+        const targetIds = curEvents.slice(-Math.min(maxVisibleItems, curEvents.length)).map(e => e.id);
+        if (targetIds.length === 0) {
+          // No events yet; retry soon
+          const retry = window.setTimeout(() => step(index), 150);
+          timersRef.current.push(retry);
+          return;
+        }
+        hasStartedInitialRef.current = true;
+        // If desired index not yet available, wait until more events arrive
+        if (index >= targetIds.length) {
+          const waitMore = window.setTimeout(() => step(index), 200);
+          timersRef.current.push(waitMore);
+          return;
+        }
+        const nextId = targetIds[index];
+        setDisplayedIds((prev) => prev.includes(nextId) ? prev : [...prev, nextId]);
+        const reached = index + 1 >= Math.min(maxVisibleItems, targetIds.length);
+        if (reached) {
+          hasCompletedInitialRef.current = true;
+          // try { console.debug('[EventStack] initial fill done'); } catch {}
+          return;
+        }
+        const jitter = 1200 + Math.random() * 900; //
+        const t = window.setTimeout(() => step(index + 1), jitter);
         timersRef.current.push(t);
-      });
+      };
+      step(0);
     }, 600);
     timersRef.current.push(startTimer);
     return () => {
       timersRef.current.forEach((t) => clearTimeout(t));
       timersRef.current = [];
     };
-  }, [visible, sequentialOnMount, events, maxVisibleItems]);
+  }, [visible, sequentialOnMount, maxVisibleItems]);
 
   // When hidden, clear displayed content so we don't flash stale items next time
   useEffect(() => {
@@ -124,12 +149,12 @@ const EventStack: React.FC<EventStackProps> = ({
   try {
     // Lightweight render log
     // eslint-disable-next-line no-console
-    console.debug('[EventStack] render', {
-      total: events.length,
-      maxVisibleItems,
-      visibleCount: visibleEvents.length,
-      visibleIds: visibleEvents.map((e) => e.id),
-    });
+    // console.debug('[EventStack] render', {
+    //   total: events.length,
+    //   maxVisibleItems,
+    //   visibleCount: visibleEvents.length,
+    //   visibleIds: visibleEvents.map((e) => e.id),
+    // });
   } catch {}
 
   return (
@@ -155,7 +180,7 @@ const EventStack: React.FC<EventStackProps> = ({
             const targetY = index * rowStride;
             try {
               // eslint-disable-next-line no-console
-              console.debug('[EventStack] item', { id: event.id, index, targetY });
+              // console.debug('[EventStack] item', { id: event.id, index, targetY });
             } catch {}
             return (
               <motion.div

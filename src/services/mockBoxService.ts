@@ -42,7 +42,7 @@ export const getBoxContents = async (_boxId: string, signal?: AbortSignal): Prom
   );
 
   if (!signal?.aborted) {
-    console.log('getBoxContents', filteredRewards);
+    // console.log('getBoxContents', filteredRewards);
   }
 
   return {
@@ -88,8 +88,8 @@ export const openBox = async (_boxId: string): Promise<ServiceBoxOpenResponse> =
   const extra = selectedReward.reward_type === "box" 
     ? `:${Math.floor(Math.random() * 1000) + 100}` // Random box ID
     : undefined;
-
-  console.log('openBox', selectedReward, extra, totalWeight);
+  
+  // console.log('openBox', selectedReward, extra, totalWeight);
   return {
     reward_type: selectedReward.reward_type,
     reward_value: selectedReward.reward_value,

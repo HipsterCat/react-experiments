@@ -65,13 +65,6 @@ export const PrizeCarousel = ({
   const pausedSinceRef = useRef<number | null>(null);
   const totalPausedMsRef = useRef<number>(0);
 
-  // Mount/unmount diagnostics
-  useEffect(() => {
-    console.log('[PrizeCarousel] mount', { itemsLength: items.length, wheelSpinState });
-    return () => {
-      console.log('[PrizeCarousel] unmount');
-    };
-  }, []);
 
   // Debug logging - commented out for performance
   // useEffect(() => {
@@ -92,7 +85,7 @@ export const PrizeCarousel = ({
   // Embla readiness diagnostics
   useEffect(() => {
     if (!emblaApi) {
-      console.log('[PrizeCarousel] emblaApi not ready yet');
+      // console.log('[PrizeCarousel] emblaApi not ready yet');
       return;
     }
     const diag = {
@@ -101,19 +94,19 @@ export const PrizeCarousel = ({
       canPrev: emblaApi.canScrollPrev(),
       canNext: emblaApi.canScrollNext(),
     };
-    console.log('[PrizeCarousel] emblaApi ready', diag);
+    // console.log('[PrizeCarousel] emblaApi ready', diag);
   }, [emblaApi]);
 
-  // Props diagnostics
-  useEffect(() => {
-    console.log('[PrizeCarousel] props updated', {
-      wheelSpinState,
-      prizesLength: prizes.length,
-      itemsLength: items.length,
-      showRevealAnimation,
-      hasActualReward: Boolean(actualReward),
-    });
-  }, [wheelSpinState, prizes, items.length, showRevealAnimation, actualReward]);
+  // // Props diagnostics
+  // useEffect(() => {
+  //   console.log('[PrizeCarousel] props updated', {
+  //     wheelSpinState,
+  //     prizesLength: prizes.length,
+  //     itemsLength: items.length,
+  //     showRevealAnimation,
+  //     hasActualReward: Boolean(actualReward),
+  //   });
+  // }, [wheelSpinState, prizes, items.length, showRevealAnimation, actualReward]);
 
   // Keep latest callback/data in refs to avoid re-running effects
   useEffect(() => {
@@ -128,7 +121,7 @@ export const PrizeCarousel = ({
     if (!selectedLoaded) return;
     const timer = setTimeout(() => {
       onRevealComplete();
-      console.log('[PrizeCarousel] onRevealComplete');
+      // console.log('[PrizeCarousel] onRevealComplete');
     }, 50);
     return () => clearTimeout(timer);
   }, [showRevealAnimation, onRevealComplete, selectedLoaded]);
@@ -138,7 +131,7 @@ export const PrizeCarousel = ({
     if (!showRevealAnimation || !onRevealComplete) return;
     const fallback = setTimeout(() => {
       if (!selectedLoaded) {
-        console.log('[PrizeCarousel] onRevealComplete (fallback)');
+        // console.log('[PrizeCarousel] onRevealComplete (fallback)');
         onRevealComplete();
       }
     }, 900);
@@ -150,17 +143,17 @@ export const PrizeCarousel = ({
     const index = emblaApi.selectedScrollSnap();
     setSelectedIndex(index);
     // Lightweight log to trace selection changes
-    console.log('[PrizeCarousel] onSelect ->', index);
+    // console.log('[PrizeCarousel] onSelect ->', index);
   }, [emblaApi]);
 
   useEffect(() => {
     if (!emblaApi) return;
     onSelect();
     emblaApi.on("select", onSelect);
-    console.log('[PrizeCarousel] emblaApi select listener attached');
+    // console.log('[PrizeCarousel] emblaApi select listener attached');
     return () => {
       emblaApi.off("select", onSelect);
-      console.log('[PrizeCarousel] emblaApi select listener detached');
+      // console.log('[PrizeCarousel] emblaApi select listener detached');
     };
   }, [emblaApi, onSelect]);
 
@@ -171,11 +164,11 @@ export const PrizeCarousel = ({
     if (!emblaApi || idleActiveRef.current) return;
     idleActiveRef.current = true;
     idleTickRef.current = 0;
-    console.log('[PrizeCarousel] IDLE -> start auto-scroll', {
-      intervalMs: 2000,
-      itemsLength: items.length,
-      selected: emblaApi.selectedScrollSnap(),
-    });
+    // console.log('[PrizeCarousel] IDLE -> start auto-scroll', {
+    //   intervalMs: 2000,
+    //   itemsLength: items.length,
+    //   selected: emblaApi.selectedScrollSnap(),
+    // });
     intervalRef.current = window.setInterval(() => {
       const before = emblaApi.selectedScrollSnap();
       idleTickRef.current += 1;
@@ -186,12 +179,12 @@ export const PrizeCarousel = ({
       }
       const after = emblaApi.selectedScrollSnap();
       if (idleTickRef.current % 3 === 1) {
-        console.log('[PrizeCarousel] IDLE tick', {
-          tick: idleTickRef.current,
-          before,
-          after,
-          itemsLength: items.length,
-        });
+        // console.log('[PrizeCarousel] IDLE tick', {
+        //   tick: idleTickRef.current,
+        //   before,
+        //   after,
+        //   itemsLength: items.length,
+        // });
       }
     }, 2000);
   }, [emblaApi, items.length]);
@@ -206,7 +199,7 @@ export const PrizeCarousel = ({
         clearInterval(intervalRef.current);
         intervalRef.current = undefined as unknown as number;
         idleActiveRef.current = false;
-        console.log('[PrizeCarousel] IDLE -> stop auto-scroll');
+        // console.log('[PrizeCarousel] IDLE -> stop auto-scroll');
       }
     }
   }, [emblaApi, wheelSpinState, startIdle]);
@@ -221,16 +214,16 @@ export const PrizeCarousel = ({
       clearInterval(intervalRef.current);
       intervalRef.current = undefined as unknown as number;
       idleActiveRef.current = false;
-      console.log('[PrizeCarousel] stop idle before SPINNING');
+      // console.log('[PrizeCarousel] stop idle before SPINNING');
     }
     if (spinningActiveRef.current) return;
     spinningActiveRef.current = true;
 
     hasSpunRef.current = true;
-    console.log("=== SPIN START ===", {
-      selected: emblaApi.selectedScrollSnap(),
-      itemsLength: items.length,
-    });
+    // console.log("=== SPIN START ===", {
+    //   selected: emblaApi.selectedScrollSnap(),
+    //   itemsLength: items.length,
+    // });
 
     spinStartTimeRef.current = Date.now();
     totalPausedMsRef.current = 0;
@@ -253,10 +246,10 @@ export const PrizeCarousel = ({
       const maxDelay = 400;
       const currentDelay = minDelay + (maxDelay - minDelay) * easedProgress;
 
-      if (now - lastLogTime > 500) {
-        console.log(`[SPIN DEBUG] Elapsed: ${totalElapsed}ms/${spinDuration}ms, Progress: ${(progress * 100).toFixed(1)}%, EasedProgress: ${(easedProgress * 100).toFixed(1)}%, CurrentDelay: ${currentDelay.toFixed(1)}ms, ScrollCount: ${scrollCount}, CurrentIndex: ${emblaApi.selectedScrollSnap()}, PrizeLength: ${items.length}`);
-        lastLogTime = now;
-      }
+        // if (now - lastLogTime > 500) {
+        //   console.log(`[SPIN DEBUG] Elapsed: ${totalElapsed}ms/${spinDuration}ms, Progress: ${(progress * 100).toFixed(1)}%, EasedProgress: ${(easedProgress * 100).toFixed(1)}%, CurrentDelay: ${currentDelay.toFixed(1)}ms, ScrollCount: ${scrollCount}, CurrentIndex: ${emblaApi.selectedScrollSnap()}, PrizeLength: ${items.length}`);
+        //   lastLogTime = now;
+        // }
 
       if (timeSinceLastScroll >= currentDelay) {
         const beforeIndex = emblaApi.selectedScrollSnap();
@@ -265,7 +258,7 @@ export const PrizeCarousel = ({
         lastScrollTimeRef.current = now;
         const afterIndex = emblaApi.selectedScrollSnap();
         if (scrollCount % 10 === 0 || currentDelay > 200) {
-          console.log(`[SCROLL] #${scrollCount}: ${beforeIndex} -> ${afterIndex}, Delay: ${currentDelay.toFixed(1)}ms, TimeSinceLastScroll: ${timeSinceLastScroll.toFixed(1)}ms`);
+          // console.log(`[SCROLL] #${scrollCount}: ${beforeIndex} -> ${afterIndex}, Delay: ${currentDelay.toFixed(1)}ms, TimeSinceLastScroll: ${timeSinceLastScroll.toFixed(1)}ms`);
         }
       }
 
@@ -279,14 +272,14 @@ export const PrizeCarousel = ({
 
         const finalIndex = emblaApi.selectedScrollSnap();
         const prizesSnapshot = prizesRef.current;
-        console.log(`[SPIN END] Total scrolls: ${scrollCount}, Final index: ${finalIndex}, Total rotations: ${(scrollCount / prizesSnapshot.length).toFixed(2)}`);
-        console.log("Prize at index:", prizesSnapshot[finalIndex]);
+        // console.log(`[SPIN END] Total scrolls: ${scrollCount}, Final index: ${finalIndex}, Total rotations: ${(scrollCount / prizesSnapshot.length).toFixed(2)}`);
+        // console.log("Prize at index:", prizesSnapshot[finalIndex]);
         window.setTimeout(() => {
           if (onFinalRewardRef.current) {
             try {
               onFinalRewardRef.current(prizesSnapshot[finalIndex]);
               setSelectedIndex(finalIndex);
-              console.log("onFinalReward", prizesSnapshot[finalIndex], "finalIndex", finalIndex);
+              // console.log("onFinalReward", prizesSnapshot[finalIndex], "finalIndex", finalIndex);
             } catch (e) {
               console.warn("onFinalReward callback failed:", e);
             }
@@ -308,7 +301,7 @@ export const PrizeCarousel = ({
       if (intervalRef.current) clearInterval(intervalRef.current);
       idleActiveRef.current = false;
       spinningActiveRef.current = false;
-      console.log('[PrizeCarousel] cleanup on unmount');
+      // console.log('[PrizeCarousel] cleanup on unmount');
     };
   }, []);
  

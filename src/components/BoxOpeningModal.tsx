@@ -57,14 +57,14 @@ const BoxOpeningModal: React.FC = () => {
 
   useEffect(() => {
     if (currentBoxId !== undefined) {
-      console.log('on box change', currentBoxId, 'viewMode:', viewMode);
+      // console.log('on box change', currentBoxId, 'viewMode:', viewMode);
       // Reset state for a new box only
       setActualReward(null);
       setRewardLoading(false);
       setShowTopupConfetti(false);
       setHasSpun(false);
       setWheelSpinState(viewMode === 'wheel' ? 'IDLE' : 'STOPPED');
-      console.log('on box change setWheelSpinState setshowrevealanimation false, currentBoxId', currentBoxId, 'viewMode', viewMode, 'wheelSpinState', wheelSpinState);
+      // console.log('on box change setWheelSpinState setshowrevealanimation false, currentBoxId', currentBoxId, 'viewMode', viewMode, 'wheelSpinState', wheelSpinState);
       setShowRevealAnimation(false);
       hasAppliedRewardRef.current = false;
 
@@ -75,7 +75,7 @@ const BoxOpeningModal: React.FC = () => {
       }
     } else {
       // Reset all state when modal closes
-      console.log('modal closed, resetting state');
+      // console.log('modal closed, resetting state');
       // Add a small delay to prevent visual glitches
       setTimeout(() => {
         setActualReward(null);
@@ -111,7 +111,7 @@ const BoxOpeningModal: React.FC = () => {
   // EventStack for showing recent activity (always mounted)
   // Visible when: wheel is idle OR result screen shows a Box (hide on spinning and on non-box result)
   const shouldShowEvents = (
-    (viewMode === 'wheel' && wheelSpinState === 'IDLE') ||
+    (viewMode === 'wheel' && (wheelSpinState === 'IDLE' || wheelSpinState === 'STOPPED')) ||
     (viewMode === 'result' && isBox)
   );
   // Only load events when modal is open and events should be visible
@@ -121,11 +121,11 @@ const BoxOpeningModal: React.FC = () => {
     // Do not react if modal is closed
     if (!isBoxOpeningModalOpen) return;
     if (hasSpun && wheelSpinState === "STOPPED" && viewMode === 'wheel') {
-      console.log('wheel stopped -> switching to result');
+      // console.log('wheel stopped -> switching to result');
       
       // If it's a box reward, start reveal animation immediately
       if (displayReward?.reward_type === 'box') {
-        console.log('displayReward -box?, displayReward', displayReward, 'boxContents.isLoading', boxContents.isLoading);
+        // console.log('displayReward -box?, displayReward', displayReward, 'boxContents.isLoading', boxContents.isLoading);
         handleTopupSuccess();
         // Wait for reveal animation to complete before switching view
         setTimeout(() => {
@@ -143,7 +143,7 @@ const BoxOpeningModal: React.FC = () => {
     if (!isBoxOpeningModalOpen) return;
     if (hasAppliedRewardRef.current) return;
     if (hasSpun && viewMode === 'result' && displayReward) {
-      console.log('hasSpun and viewMode is result -> trigger confetti');
+      // console.log('hasSpun and viewMode is result -> trigger confetti');
       // Trigger confetti for box rewards
       if (displayReward?.reward_type === "box") {
         handleTopupSuccess();
@@ -175,10 +175,10 @@ const BoxOpeningModal: React.FC = () => {
       setRewardLoading(true);
       hasAppliedRewardRef.current = false;
 
-      console.log('startSpinning, openBox', currentBoxId);
+      // console.log('startSpinning, openBox', currentBoxId);
       const data = await openBox(String(currentBoxId));
 
-      console.log('startSpinning setWheelSpinState SPINNING', data);
+      // console.log('startSpinning setWheelSpinState SPINNING', data);
       setWheelSpinState("SPINNING");
       setRewardLoading(false);
       setHasSpun(true);
@@ -186,13 +186,13 @@ const BoxOpeningModal: React.FC = () => {
     } catch (error) {
       console.error(error);
       showSnackbar(t("profilePage.dailyModal.error"), { type: "error" });
-      console.log('startSpinning closeBoxModal');
+      // console.log('startSpinning closeBoxModal');
       closeBoxModal();
     }
   };
 
   const handleContinue = () => {
-    console.log('handleContinue closeBoxModal');
+    // console.log('handleContinue closeBoxModal');
     closeBoxModal();
     dispatch(fetchTasks());
     dispatch(fetchProfile()); 
@@ -201,7 +201,7 @@ const BoxOpeningModal: React.FC = () => {
   const handleOpenNow = async () => {
     // No nesting: switch current modal from result to wheel for the same box
     if (currentBoxId === undefined) {
-      console.log('handleOpenNow: no currentBoxId, closing');
+      // console.log('handleOpenNow: no currentBoxId, closing');
       closeBoxModal();
       dispatch(fetchTasks());
       dispatch(fetchProfile());
@@ -209,7 +209,7 @@ const BoxOpeningModal: React.FC = () => {
     }
 
     if (isSwitchingToWheel || boxContents.isLoading) {
-      console.log('handleOpenNow: already switching/loading, ignoring');
+      // console.log('handleOpenNow: already switching/loading, ignoring');
       return;
     }
 
@@ -268,7 +268,7 @@ const BoxOpeningModal: React.FC = () => {
       fromCoordinates: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
       fromSize: { width: 180, height: 180 },
       onClick: () => {
-        console.log('Open inventory requested from toast');
+        // console.log('Open inventory requested from toast');
       },
     });
   };
@@ -291,33 +291,33 @@ const BoxOpeningModal: React.FC = () => {
 
   
   // Debug logging (avoid object identity churn)
-  useEffect(() => {
-    const rewardType = displayReward?.reward_type ?? null;
-    const rewardValue = displayReward?.reward_value ?? null;
-    console.log('[BoxOpeningModal] State:', {
-      viewMode,
-      hasSpun,
-      rewardType,
-      rewardValue,
-      actualRewardType: actualReward?.reward_type ?? null,
-      actualRewardValue: actualReward?.reward_value ?? null,
-      isBox,
-      showRevealAnimation,
-      wheelSpinState,
-      currentBoxId
-    });
-  }, [
-    viewMode,
-    hasSpun,
-    actualReward?.reward_type,
-    actualReward?.reward_value,
-    isBox,
-    showRevealAnimation,
-    wheelSpinState,
-    currentBoxId,
-    displayReward?.reward_type,
-    displayReward?.reward_value,
-  ]);
+  // useEffect(() => {
+  //   const rewardType = displayReward?.reward_type ?? null;
+  //   const rewardValue = displayReward?.reward_value ?? null;
+  //   console.log('[BoxOpeningModal] State:', {
+  //     viewMode,
+  //     hasSpun,
+  //     rewardType,
+  //     rewardValue,
+  //     actualRewardType: actualReward?.reward_type ?? null,
+  //     actualRewardValue: actualReward?.reward_value ?? null,
+  //     isBox,
+  //     showRevealAnimation,
+  //     wheelSpinState,
+  //     currentBoxId
+  //   });
+  // }, [
+  //   viewMode,
+  //   hasSpun,
+  //   actualReward?.reward_type,
+  //   actualReward?.reward_value,
+  //   isBox,
+  //   showRevealAnimation,
+  //   wheelSpinState,
+  //   currentBoxId,
+  //   displayReward?.reward_type,
+  //   displayReward?.reward_value,
+  // ]);
 
   const getBg = () => {
     if (
@@ -399,7 +399,7 @@ const BoxOpeningModal: React.FC = () => {
                 showRevealAnimation={showRevealAnimation}
                 onRevealComplete={() => {
                   setShowRevealAnimation(false);
-                  console.log('onRevealComplete setShowRevealAnimation false, setHasSpun false, setWheelSpinState IDLE');
+                  // console.log('onRevealComplete setShowRevealAnimation false, setHasSpun false, setWheelSpinState IDLE');
                   // Prepare wheel state before switching to avoid immediate flip back to result
 
                   // Switch to wheel exactly when reveal completes to avoid empty gap
@@ -408,7 +408,7 @@ const BoxOpeningModal: React.FC = () => {
                   }
                 }}
                 onFinalReward={(reward) => {
-                  console.log('[BoxOpeningModal] onFinalReward:', reward);
+                  // console.log('[BoxOpeningModal] onFinalReward:', reward);
                   setActualReward(reward as any);
                 }}
               />

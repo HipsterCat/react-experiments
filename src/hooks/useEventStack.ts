@@ -11,7 +11,7 @@ export const useEventStack = (shouldLoad: boolean = false) => {
   const addEvent = useCallback((event: EventStackItem) => {
     try {
       // eslint-disable-next-line no-console
-      console.debug('[useEventStack] addEvent', { id: event.id });
+      // console.debug('[useEventStack] addEvent', { id: event.id });
     } catch {}
     setEvents(prev => [...prev, event]); // Append to end so it appears at bottom
   }, []);
@@ -33,16 +33,18 @@ export const useEventStack = (shouldLoad: boolean = false) => {
     try {
       try {
         // eslint-disable-next-line no-console
-        console.debug('[useEventStack] startLoading', { total: 15 });
+        // console.debug('[useEventStack] startLoading', { total: 15 });
       } catch {}
       await loadEventsGradually(
         addEvent,
         15, // Total events to load
         600, // Initial delay before continuing after burst (modal open animation)
-        3000, // Interval between events (3 seconds)
+        3000, // Base interval (unused when jitter provided)
         abortRef.current.signal,
         4,   // Initial burst count
-        500  // Burst interval for sequential grow-in
+        500, // Burst interval for sequential grow-in
+        800, // Jitter min
+        1600 // Jitter max
       );
     } catch (error: unknown) {
       const err = error as { name?: string };
@@ -63,7 +65,7 @@ export const useEventStack = (shouldLoad: boolean = false) => {
   const clearEvents = useCallback(() => {
     try {
       // eslint-disable-next-line no-console
-      console.debug('[useEventStack] clearEvents');
+      // console.debug('[useEventStack] clearEvents');
     } catch {}
     setEvents([]);
     hasStartedLoadingRef.current = false;
@@ -95,7 +97,7 @@ export const useEventStack = (shouldLoad: boolean = false) => {
       if (abortRef.current) {
         try {
           // eslint-disable-next-line no-console
-          console.debug('[useEventStack] cleanup abort (unmount)');
+          // console.debug('[useEventStack] cleanup abort (unmount)');
         } catch {}
         abortRef.current.abort();
         abortRef.current = null;
