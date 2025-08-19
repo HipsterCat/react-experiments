@@ -8,7 +8,6 @@ import { BoxOpeningProvider } from './hooks/useBoxOpening'
 import { BalanceAnimationProvider, useBalanceAnimation } from './hooks/useBalanceAnimation'
 import { NiceToastProvider } from './components/NiceToastProvider'
 import EventStackDemo from './components/EventStackDemo'
-import { TabbarProvider } from './components/Tabbar/TabbarProvider'
 import { NavigationProvider, Page, NavButton, useNavigation } from './StateRouter'
 
 function App() {
@@ -18,9 +17,7 @@ function App() {
         <BalanceAnimationProvider>
           <BoxOpeningProvider>
             <NavigationProvider defaultPage="leaderboard">
-              <TabbarProvider>
                 <MainContent />
-              </TabbarProvider>
             </NavigationProvider>
             
             <BoxOpeningModal />

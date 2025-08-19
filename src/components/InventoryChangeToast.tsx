@@ -1,4 +1,5 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion';
 
 interface InventoryItem {
@@ -21,8 +22,8 @@ export interface InventoryChangeToastRef {
   hide: () => void;
 }
 
-// Animation phases
-type AnimationPhase = 'hidden' | 'appearing' | 'itemFlying' | 'itemsCollapsing' | 'labelShowing' | 'hiding';
+// Simplified animation states
+type AnimationState = 'hidden' | 'visible' | 'hiding';
 
 // Size presets
 const sizePresets = {
@@ -30,12 +31,23 @@ const sizePresets = {
   expanded: { width: 320, height: 56, borderRadius: 28 },
 };
 
+// Dynamic Island-inspired spring physics
+const springConfig = {
+  type: "spring" as const,
+  stiffness: 400,
+  damping: 30,
+};
+
+// Smooth cubic-bezier easing for non-spring animations
+const smoothEasing = [0.165, 0.84, 0.44, 1] as const;
+
+
 const InventoryChangeToast = forwardRef<InventoryChangeToastRef>((_, ref) => {
-  const [phase, setPhase] = useState<AnimationPhase>('hidden');
+  const [state, setState] = useState<AnimationState>('hidden');
   const [data, setData] = useState<InventoryChangeToastData | null>(null);
-  const [isVisible, setIsVisible] = useState(false);
+  const [showExpanded, setShowExpanded] = useState(false);
   const hideTimeoutRef = useRef<NodeJS.Timeout>();
-  const phaseTimeoutRef = useRef<NodeJS.Timeout>();
+  const expandTimeoutRef = useRef<NodeJS.Timeout>();
   
   // Motion values for flying item
   const flyingItemX = useMotionValue(0);
@@ -46,84 +58,60 @@ const InventoryChangeToast = forwardRef<InventoryChangeToastRef>((_, ref) => {
   const show = (toastData: InventoryChangeToastData) => {
     // Clear any existing timeouts
     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-    if (phaseTimeoutRef.current) clearTimeout(phaseTimeoutRef.current);
+    if (expandTimeoutRef.current) clearTimeout(expandTimeoutRef.current);
     
     setData(toastData);
     
     // Initialize flying item position
     const toastCenterX = window.innerWidth / 2;
-    const toastCenterY = 80; // Top position
+    const toastTop = 80;
+    const toastCenterY = toastTop + sizePresets.circle.height / 2;
+    const screenCenterY = window.innerHeight / 2;
     
-    console.log('Toast animation starting', {
-      fromX: toastData.fromCoordinates.x,
-      fromY: toastData.fromCoordinates.y,
-      toastCenterX,
-      toastCenterY,
-      offsetX: toastData.fromCoordinates.x - toastCenterX,
-      offsetY: toastData.fromCoordinates.y - toastCenterY
-    });
+    // Set up flying item initial position and scale
+    flyingItemX.set(0);
+    flyingItemY.set(0);
     
-    flyingItemX.set(toastData.fromCoordinates.x - toastCenterX);
-    flyingItemY.set(toastData.fromCoordinates.y - toastCenterY);
-    
-    // Calculate initial scale based on source size
     const sourceSize = toastData.fromSize?.width || 140;
-    const targetSize = 40; // Flying item is 40px (w-10 h-10)
+    const targetSize = 40;
     const initialScale = sourceSize / targetSize;
     
     flyingItemScale.set(initialScale);
     flyingItemOpacity.set(1);
     
-    console.log('Flying item animation:', {
-      sourceSize,
-      targetSize,
-      initialScale,
-      fromX: toastData.fromCoordinates.x,
-      fromY: toastData.fromCoordinates.y
-    });
+    // Start animation sequence
+    setState('visible');
     
-    // Start with flying item immediately
-    setPhase('itemFlying');
+    // Animate flying item to toast position
+    animate(flyingItemX, 0, { duration: 0.5, ease: smoothEasing });
+    animate(flyingItemY, toastCenterY - screenCenterY, { duration: 0.5, ease: smoothEasing });
+    animate(flyingItemScale, 1, { duration: 0.5, ease: smoothEasing });
     
-    // Animate flying item to toast center (circle state)
-    animate(flyingItemX, 0, { duration: 0.5, ease: [0.32, 0.72, 0, 1] });
-    animate(flyingItemY, 0, { duration: 0.5, ease: [0.32, 0.72, 0, 1] });
-    animate(flyingItemScale, 1, { duration: 0.5, ease: [0.32, 0.72, 0, 1] });
-    
-    // Phase 1: Toast appears when item is halfway (250ms)
-    phaseTimeoutRef.current = setTimeout(() => {
-      setIsVisible(true);
+    // Fade out flying item and expand toast smoothly
+    setTimeout(() => {
+      animate(flyingItemOpacity, 0, { duration: 0.25, ease: smoothEasing });
+      setShowExpanded(true);
       
-      // Fade out flying item as toast icon appears
-      phaseTimeoutRef.current = setTimeout(() => {
-        animate(flyingItemOpacity, 0, { duration: 0.2 });
-        setPhase('itemsCollapsing');
-        
-        // Phase 3: Full label display (800ms)
-        phaseTimeoutRef.current = setTimeout(() => {
-          setPhase('labelShowing');
-          
-          // Phase 4: Hide after 4000ms total
-          hideTimeoutRef.current = setTimeout(() => {
-            hide();
-          }, 2800);
-        }, 300);
-      }, 300);
-    }, 250);
+      // Auto-hide after showing expanded content
+      hideTimeoutRef.current = setTimeout(() => {
+        hide();
+      }, 3000);
+    }, 400);
   };
   
   const hide = () => {
     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-    if (phaseTimeoutRef.current) clearTimeout(phaseTimeoutRef.current);
+    if (expandTimeoutRef.current) clearTimeout(expandTimeoutRef.current);
     
-    setPhase('hiding');
-    animate(flyingItemOpacity, 0, { duration: 0.4, ease: 'easeOut' });
+    setState('hiding');
+    animate(flyingItemOpacity, 0, { duration: 0.25, ease: smoothEasing });
     
-    setTimeout(() => {
-      setIsVisible(false);
-      setPhase('hidden');
+    // Clean up after animation completes
+    hideTimeoutRef.current = setTimeout(() => {
+      setState('hidden');
+      setShowExpanded(false);
       setData(null);
-    }, 600); // Increased for smoother transition
+    }, 400);
   };
   
   useImperativeHandle(ref, () => ({ show, hide }));
@@ -132,56 +120,74 @@ const InventoryChangeToast = forwardRef<InventoryChangeToastRef>((_, ref) => {
   useEffect(() => {
     return () => {
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-      if (phaseTimeoutRef.current) clearTimeout(phaseTimeoutRef.current);
+      if (expandTimeoutRef.current) clearTimeout(expandTimeoutRef.current);
     };
   }, []);
   
-  // Determine current size based on phase
-  const currentSize = phase === 'itemsCollapsing' || phase === 'labelShowing' ? 'expanded' : 'circle';
-  const showOtherItems = phase === 'itemsCollapsing' || phase === 'labelShowing';
-  const showLabel = phase === 'itemsCollapsing' || phase === 'labelShowing';
-  const hideOtherItems = phase === 'hiding';
+  // Determine current size and visibility based on simplified state
+  const currentSize = showExpanded ? 'expanded' : 'circle';
+  const isVisible = state === 'visible' || state === 'hiding';
   
   // Filter only box items and prepare display
   const boxItems = data?.otherItems?.filter(item => 
     item.icon.includes('box_') || item.icon.includes('mystery_box')
   ) || [];
-  const displayItems = phase === 'itemsCollapsing' ? boxItems : boxItems.slice(0, 3);
+  const displayItems = boxItems.slice(0, 3);
   const totalBoxCount = boxItems.length + 1; // +1 for main item if it's a box
   
   return (
     <div className="fixed left-1/2 -translate-x-1/2 top-20 z-[13000]">
       {/* Main Toast Container */}
-      <motion.div
-        className="relative flex items-center bg-white shadow-lg overflow-hidden cursor-pointer"
-        style={{ 
-          outline: '1px solid rgba(0, 0, 0, 0.2)',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)'
-        }}
-        initial={false}
-        animate={{
-          width: sizePresets[currentSize].width,
-          height: sizePresets[currentSize].height,
-          borderRadius: sizePresets[currentSize].borderRadius,
-          scale: isVisible && phase !== 'hiding' ? 1 : 0.5,
-          opacity: isVisible && phase !== 'hiding' ? 1 : 0,
-        }}
-        transition={{
-          width: { duration: 0.4, ease: [0.32, 0.72, 0, 1] },
-          height: { duration: 0.4, ease: [0.32, 0.72, 0, 1] },
-          borderRadius: { duration: 0.4, ease: [0.32, 0.72, 0, 1] },
-          scale: phase === 'hiding' 
-            ? { duration: 0.5, ease: [0.32, 0, 0.67, 0] }
-            : { duration: 0.3, ease: [0.32, 0.72, 0, 1] },
-          opacity: phase === 'hiding'
-            ? { duration: 0.5, ease: 'easeOut' }
-            : { duration: 0.2 },
-        }}
-        onClick={data?.onClick}
-        whileHover={{ scale: data?.onClick ? 1.02 : 1 }}
-        whileTap={{ scale: data?.onClick ? 0.98 : 1 }}
-      >
-        <div className="flex items-center justify-between w-full h-full px-3">
+      <AnimatePresence>
+        {isVisible && (
+          <motion.div
+            className="relative flex items-center bg-white shadow-lg overflow-hidden cursor-pointer"
+            style={{ 
+              outline: '0.5px solid rgba(0, 0, 0, 0.15)',
+              boxShadow: '0 4px 14px rgba(0, 0, 0, 0.15)'
+            }}
+            initial={{
+              width: sizePresets.circle.width,
+              height: sizePresets.circle.height,
+              borderRadius: sizePresets.circle.borderRadius,
+              scale: 0.3,
+              opacity: 0,
+            }}
+            animate={{
+              width: sizePresets[currentSize].width,
+              height: sizePresets[currentSize].height,
+              borderRadius: sizePresets[currentSize].borderRadius,
+              scale: 1,
+              opacity: 1,
+            }}
+            exit={{
+              width: sizePresets.circle.width,
+              height: sizePresets.circle.height,
+              borderRadius: sizePresets.circle.borderRadius,
+              scale: 0.3,
+              opacity: 0,
+              transition: { 
+                width: { duration: 0.2, ease: smoothEasing },
+                height: { duration: 0.2, ease: smoothEasing },
+                borderRadius: { duration: 0.2, ease: smoothEasing },
+                scale: { duration: 0.25, ease: smoothEasing, delay: 0.15 },
+                opacity: { duration: 0.15, ease: smoothEasing, delay: 0.2 }
+              }
+            }}
+            transition={springConfig}
+            onClick={data?.onClick}
+            whileHover={{ 
+              scale: data?.onClick ? 1.02 : 1, 
+              boxShadow: '0 6px 18px rgba(0, 0, 0, 0.20)', 
+              outline: '0.5px solid rgba(0, 0, 0, 0.2)',
+              transition: { duration: 0.15, ease: smoothEasing }
+            }}
+            whileTap={{ 
+              scale: data?.onClick ? 0.98 : 1,
+              transition: { duration: 0.1, ease: smoothEasing }
+            }}
+          >
+        <div className="flex items-center justify-between w-full h-full pl-3 pr-1">
           {/* Left section: Main icon and label */}
           <div className="flex items-center flex-1">
             {/* Main Item Icon (destination) */}
@@ -189,12 +195,12 @@ const InventoryChangeToast = forwardRef<InventoryChangeToastRef>((_, ref) => {
               className="w-10 h-10 flex-shrink-0"
               initial={{ opacity: 0, scale: 0 }}
               animate={{
-                opacity: phase === 'itemsCollapsing' || phase === 'labelShowing' ? 1 : 0,
-                scale: phase === 'itemsCollapsing' || phase === 'labelShowing' ? 1 : 0,
+                opacity: 1,
+                scale: 1,
               }}
               transition={{ 
-                duration: 0.2,
-                delay: 0
+                ...springConfig,
+                delay: 0.3
               }}
             >
               {data?.mainItem && (
@@ -208,16 +214,16 @@ const InventoryChangeToast = forwardRef<InventoryChangeToastRef>((_, ref) => {
             
             {/* Success Label */}
             <AnimatePresence>
-              {showLabel && (
+              {showExpanded && (
                 <motion.div
-                  className="ml-3"
-                  initial={{ x: -30, opacity: 0, scale: 1.3 }}
-                  animate={{ x: 0, opacity: 1, scale: 1 }}
-                  exit={{ x: 10, opacity: 0, scale: 0.9 }}
+                  className="ml-2"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
                   transition={{ 
-                    duration: 0.4, 
-                    ease: [0.32, 0.72, 0, 1],
-                    delay: phase === 'itemsCollapsing' ? 0.2 : 0
+                    duration: 0.25,
+                    ease: smoothEasing,
+                    delay: 0.1
                   }}
                 >
                   <p className="text-black font-semibold text-sm whitespace-nowrap">
@@ -228,71 +234,55 @@ const InventoryChangeToast = forwardRef<InventoryChangeToastRef>((_, ref) => {
             </AnimatePresence>
           </div>
           
-          {/* Right section: Other items and chevron */}
-          <div className="flex items-center">
-            {/* Other Items Preview */}
+          {/* Right section: Trailing group (stack + counter + chevron) */}
+          <div className="flex items-center gap-1">
+            {/* Trailing group */}
             <AnimatePresence>
-              {showOtherItems && (
+              {showExpanded && (
                 <motion.div
-                  className="flex items-center mr-2"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
+                  className="flex items-center"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ 
+                    duration: 0.25,
+                    ease: smoothEasing,
+                    delay: 0.15
+                  }}
                 >
-                  <div className="relative flex items-center h-9" style={{ width: '100px' }}>
-                    {displayItems.map((item, index) => {
-                      const isCollapsing = phase === 'itemsCollapsing';
-                      const itemIndex = boxItems.indexOf(item);
-                      const spacing = isCollapsing ? -4 : -8;
-                      
-                      return (
-                        <motion.div
-                          key={item.id}
-                          className="absolute w-9 h-9"
-                          initial={{
-                            x: isCollapsing ? itemIndex * 12 : 0,
-                            scale: 0,
-                            opacity: 0,
-                          }}
-                          animate={{
-                            x: hideOtherItems ? 0 : (isCollapsing && index < 3 ? index * spacing : itemIndex * spacing),
-                            y: hideOtherItems ? 20 : 0,
-                            scale: hideOtherItems ? 0 : (isCollapsing && index >= 3 ? 0 : 1),
-                            opacity: hideOtherItems ? 0 : (isCollapsing && index >= 3 ? 0 : 1),
-                          }}
-                          transition={{
-                            duration: 0.5,
-                            delay: isCollapsing ? 0 : index * 0.05,
-                            ease: [0.32, 0.72, 0, 1],
-                          }}
-                          style={{ 
-                            zIndex: displayItems.length - index,
-                            left: index * 28
-                          }}
-                        >
-                          <img 
-                            src={item.icon} 
-                            alt={item.name || ''} 
-                            className="w-full h-full object-contain"
-                          />
-                        </motion.div>
-                      );
-                    })}
+                  <div className="relative flex items-center h-9 mr-1" style={{ width: '70px' }}>
+                    {displayItems.map((item, index) => (
+                      <motion.div
+                        key={item.id}
+                        className="absolute w-9 h-9"
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{
+                          ...springConfig,
+                          delay: 0.2 + (index * 0.03),
+                        }}
+                        style={{ 
+                          zIndex: displayItems.length - index,
+                          right: index * 14
+                        }}
+                      >
+                        <img 
+                          src={item.icon} 
+                          alt={item.name || ''} 
+                          className="w-full h-full object-contain"
+                        />
+                      </motion.div>
+                    ))}
                     
                     {/* Counter badge */}
                     {totalBoxCount > 1 && (
                       <motion.div
-                        className="absolute -bottom-1 right-0 bg-gray-800 text-white rounded-full px-1.5 py-0.5 text-xs font-bold"
+                        className="absolute -bottom-1 -right-1 bg-gray-800 text-white rounded-full px-1.5 py-0.5 text-xs font-bold"
                         initial={{ scale: 0, opacity: 0 }}
-                        animate={{
-                          scale: hideOtherItems ? 0 : 1,
-                          opacity: hideOtherItems ? 0 : 1,
-                        }}
+                        animate={{ scale: 1, opacity: 1 }}
                         transition={{
-                          duration: 0.3,
-                          delay: 0.2,
-                          ease: [0.32, 0.72, 0, 1],
+                          ...springConfig,
+                          delay: 0.35,
                         }}
                         style={{ 
                           zIndex: 10,
@@ -304,67 +294,67 @@ const InventoryChangeToast = forwardRef<InventoryChangeToastRef>((_, ref) => {
                       </motion.div>
                     )}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            
-            {/* Right Chevron */}
-            <AnimatePresence>
-              {showOtherItems && data?.onClick && (
-                <motion.div
-                  className="text-gray-400 ml-1"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  
+                  {/* Chevron */}
+                  {data?.onClick && (
+                    <motion.div
+                      className="text-gray-400 pl-1 pr-2"
+                      initial={{ opacity: 0, x: 5 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 5 }}
+                      transition={{ 
+                        duration: 0.25,
+                        ease: smoothEasing,
+                        delay: 0.2
+                      }}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </motion.div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-        </div>
-      </motion.div>
-      
-      {/* Flying Item */}
-      <AnimatePresence>
-        {data && (phase === 'itemFlying' || phase === 'appearing') && (
-          <motion.div
-            className="fixed pointer-events-none z-[13001]"
-            style={{
-              left: '50%',
-              top: '80px',
-              x: flyingItemX,
-              y: flyingItemY,
-              marginLeft: '-20px',
-              marginTop: '-20px',
-            }}
-          >
-            <motion.div
-              className="w-10 h-10"
-              style={{
-                scale: flyingItemScale,
-                opacity: flyingItemOpacity,
-              }}
-              animate={{
-                rotate: [0, 180, 360],
-              }}
-              transition={{
-                duration: 0.6,
-                ease: "linear",
-              }}
-            >
-              <img 
-                src={data.mainItem.icon} 
-                alt="" 
-                className="w-full h-full object-contain"
-              />
-            </motion.div>
+          </div>
           </motion.div>
         )}
       </AnimatePresence>
+      
+      {/* Flying Item */}
+      {createPortal(
+        <AnimatePresence>
+          {data && state === 'visible' && (
+            <motion.div
+              className="fixed pointer-events-none z-[13001]"
+              style={{
+                left: '50%',
+                top: '50%',
+                x: flyingItemX,
+                y: flyingItemY,
+                marginLeft: '-20px',
+                marginTop: '-20px',
+              }}
+            >
+              <motion.div
+                className="w-10 h-10"
+                style={{
+                  scale: flyingItemScale,
+                  opacity: flyingItemOpacity,
+                }}
+              >
+                <img 
+                  src={data.mainItem.icon} 
+                  alt="" 
+                  className="w-full h-full object-contain"
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 });

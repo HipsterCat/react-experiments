@@ -62,6 +62,7 @@ export const BalanceAnimationProvider: FC<{ children: ReactNode }> = ({ children
 
 export const useBalanceAnimation = () => {
   const context = useContext(BalanceAnimationContext);
+  console.log('useBalanceAnimation', context);
   if (context === undefined) {
     throw new Error('useBalanceAnimation must be used within a BalanceAnimationProvider');
   }

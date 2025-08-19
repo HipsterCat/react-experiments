@@ -10,8 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ngneat/falso": "^8.0.2",
     "@number-flow/react": "^0.5.10",
     "@telegram-apps/telegram-ui": "^2.1.9",
+    "@virtuoso.dev/message-list": "^1.13.2",
     "clsx": "^2.1.1",
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",

@@ -23,7 +23,7 @@ export const AnimatedFullscreen: React.FC<AnimatedFullscreenProps> = ({
   onClose,
   children,
   backgroundImage,
-  backgroundColor = 'rgba(0, 0, 0, 1.0)',
+  backgroundColor = 'rgba(0, 0, 0, 0.0)',
   animationType = 'scale',
   disableTabbarToggle = false,
   showCloseButton = true,

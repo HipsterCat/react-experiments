@@ -24,10 +24,10 @@ const InventoryChangeToastDemo: React.FC = () => {
     const container = e.currentTarget;
     const rect = container.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+    const centerY = rect.top + (rect.height / 2) - 40;
     
     // Get actual content size (container has p-3 = 12px padding)
-    const paddingSize = 12 * 2; // p-3 on all sides
+    const paddingSize = (12 + 2) * 2; // p-3 on all sides
     const contentSize = rect.width - paddingSize;
     
     console.log('Clicked item:', itemId, {
