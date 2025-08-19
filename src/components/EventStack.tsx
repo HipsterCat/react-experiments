@@ -38,51 +38,88 @@ const EventStack: React.FC<EventStackProps> = ({
   const rowStride = (itemHeight + gap);
   const bottomSpawnY = maxVisibleItems * rowStride + itemHeight; // always below full stack
 
-  // Handle initial sequential fill
-  const [initialVisibleCount, setInitialVisibleCount] = useState(0);
+  // Local displayed queue for smooth sequencing and rotation
+  const [displayedIds, setDisplayedIds] = useState<string[]>([]);
   const hasCompletedInitialRef = useRef(false);
+  const timersRef = useRef<number[]>([]);
 
+  // Reset sequencing on visibility change
   useEffect(() => {
-    if (!sequentialOnMount) return;
-    if (hasCompletedInitialRef.current) return;
-    if (events.length === 0) return;
-
-    const target = Math.min(maxVisibleItems, events.length);
-    setInitialVisibleCount(0);
-    let cancelled = false;
-
-    try {
-      // eslint-disable-next-line no-console
-      console.debug('[EventStack] initial fill start', { target });
-    } catch {}
-
-    const stepOnce = (nextCount: number) => {
-      if (cancelled) return;
-      setInitialVisibleCount(nextCount);
-      if (nextCount >= target) {
-        hasCompletedInitialRef.current = true;
-        try {
-          // eslint-disable-next-line no-console
-          console.debug('[EventStack] initial fill done');
-        } catch {}
-        return;
-      }
-      setTimeout(() => stepOnce(nextCount + 1), 120);
-    };
-
-    stepOnce(1);
-
+    timersRef.current.forEach((t) => clearTimeout(t));
+    timersRef.current = [];
+    if (!visible) return;
+    if (!sequentialOnMount) {
+      // Immediate fill to last N when not sequencing
+      const target = events.slice(-Math.min(maxVisibleItems, events.length)).map(e => e.id);
+      setDisplayedIds(target);
+      hasCompletedInitialRef.current = true;
+      return;
+    }
+    try { console.debug('[EventStack] initial fill start (visible)'); } catch {}
+    hasCompletedInitialRef.current = false;
+    setDisplayedIds([]);
+    const targetIds = events.slice(-Math.min(maxVisibleItems, events.length)).map(e => e.id);
+    // Start after 600ms, then add one every 500ms
+    const startTimer = window.setTimeout(() => {
+      targetIds.forEach((id, i) => {
+        const t = window.setTimeout(() => {
+          setDisplayedIds((prev) => {
+            const next = [...prev, id];
+            if (next.length >= Math.min(maxVisibleItems, targetIds.length)) {
+              hasCompletedInitialRef.current = true;
+              try { console.debug('[EventStack] initial fill done'); } catch {}
+            }
+            return next;
+          });
+        }, i * 500);
+        timersRef.current.push(t);
+      });
+    }, 600);
+    timersRef.current.push(startTimer);
     return () => {
-      cancelled = true;
+      timersRef.current.forEach((t) => clearTimeout(t));
+      timersRef.current = [];
     };
-  }, [sequentialOnMount, events.length, maxVisibleItems]);
+  }, [visible, sequentialOnMount, events, maxVisibleItems]);
 
-  const sliceCount = sequentialOnMount && !hasCompletedInitialRef.current
-    ? Math.min(initialVisibleCount, maxVisibleItems, events.length)
-    : Math.min(maxVisibleItems, events.length);
+  // When hidden, clear displayed content so we don't flash stale items next time
+  useEffect(() => {
+    if (!visible) {
+      setDisplayedIds([]);
+      hasCompletedInitialRef.current = false;
+      lastIdRef.current = null;
+    }
+  }, [visible]);
 
-  // Compute visible items once and log render state
-  const visibleEvents = events.slice(-sliceCount);
+  // On new events after initial fill, rotate: drop oldest, append newest
+  const lastIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!visible) return;
+    if (!hasCompletedInitialRef.current) return;
+    if (events.length === 0) return;
+    const newestId = events[events.length - 1].id;
+    if (lastIdRef.current === newestId) return;
+    lastIdRef.current = newestId;
+    setDisplayedIds((prev) => {
+      // If not full, just append
+      if (prev.length < Math.min(maxVisibleItems, events.length)) {
+        return prev.includes(newestId) ? prev : [...prev, newestId];
+      }
+      // If already full, rotate only if this is a new id
+      if (prev.includes(newestId)) return prev;
+      const rotated = [...prev.slice(1), newestId];
+      return rotated;
+    });
+  }, [events, visible, maxVisibleItems]);
+
+  // Build visibleEvents by mapping ids to actual items
+  const idToEvent = new Map(events.map((e) => [e.id, e] as const));
+  const visibleEvents = displayedIds
+    .slice(-Math.min(maxVisibleItems, displayedIds.length))
+    .map((id) => idToEvent.get(id))
+    .filter(Boolean) as typeof events;
+
+  const containerVisible = visible && (!sequentialOnMount || displayedIds.length > 0);
 
   try {
     // Lightweight render log
@@ -103,10 +140,10 @@ const EventStack: React.FC<EventStackProps> = ({
         height: fixedHeight,
       }}
       initial={{ opacity: 0, x: -50 }}
-      animate={{ opacity: visible ? 1 : 0, x: visible ? 0 : -50 }}
+      animate={{ opacity: containerVisible ? 1 : 0, x: containerVisible ? 0 : -50 }}
       transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
     >
-      {title && events.length > 0 && (
+      {title && visibleEvents.length > 0 && (
         <div className="text-xs font-semibold text-gray-700 mb-1.5 px-2 select-none">
           {title}
         </div>

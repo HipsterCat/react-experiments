@@ -38,9 +38,11 @@ export const useEventStack = (shouldLoad: boolean = false) => {
       await loadEventsGradually(
         addEvent,
         15, // Total events to load
-        1000, // Initial delay
-        3000, // Interval between events (3 seconds to match stack rotation)
-        abortRef.current.signal
+        600, // Initial delay before continuing after burst (modal open animation)
+        3000, // Interval between events (3 seconds)
+        abortRef.current.signal,
+        4,   // Initial burst count
+        500  // Burst interval for sequential grow-in
       );
     } catch (error: unknown) {
       const err = error as { name?: string };

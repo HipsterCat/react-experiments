@@ -16,11 +16,17 @@ const LAST_NAMES = [
 
 // Event templates could be used for user-facing strings; not needed in this mock generator
 
-// Generate a random timestamp within the last 24 hours
+// Generate a random timestamp within the last 24 hours, biased towards recent
 const getRandomTimestamp = (): Date => {
   const now = Date.now();
-  const randomOffset = Math.random() * 24 * 60 * 60 * 1000; // 24 hours in ms
-  return new Date(now - randomOffset);
+  // Bias: 60% within last hour, 30% within last 6 hours, 10% within 24 hours
+  const r = Math.random();
+  let maxMs: number;
+  if (r < 0.6) maxMs = 60 * 60 * 1000; // 1 hour
+  else if (r < 0.9) maxMs = 6 * 60 * 60 * 1000; // 6 hours
+  else maxMs = 24 * 60 * 60 * 1000; // 24 hours
+  const offset = Math.random() * maxMs;
+  return new Date(now - offset);
 };
 
 // Get reward image path
@@ -127,7 +133,9 @@ export const loadEventsGradually = async (
   totalEvents: number = 15,
   initialDelay: number = 1000,
   intervalMs: number = 2000,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  burstCount: number = 4,
+  burstIntervalMs: number = 120
 ): Promise<void> => {
   try {
     try {
@@ -137,24 +145,35 @@ export const loadEventsGradually = async (
     const allEvents = await generateMockEvents(totalEvents, signal);
     if (signal?.aborted) return;
     // console.log('allEvents', allEvents);
-    
-    // Add initial delay before starting
-    await wait(initialDelay, signal);
-    if (signal?.aborted) return;
-    // console.log('initialDelay', initialDelay);
-    
-    // Load events one by one with intervals
-    for (let i = 0; i < allEvents.length; i++) {
+
+    // Emit an initial burst quickly so the stack fills 1,2,3,4
+    const initialBurst = Math.min(burstCount, allEvents.length);
+    for (let i = 0; i < initialBurst; i++) {
+      if (signal?.aborted) return;
+      try {
+        console.debug('[mockEventService] loadEventsGradually:emit(burst)', { index: i, id: allEvents[i].id });
+      } catch {}
+      onEventLoaded(allEvents[i]);
+      if (i < initialBurst - 1) {
+        await wait(burstIntervalMs, signal);
+      }
+    }
+
+    // Add initial delay before continuing the rest (account for modal open animation)
+    if (initialDelay > 0 && initialBurst < allEvents.length) {
+      await wait(initialDelay, signal);
+      if (signal?.aborted) return;
+    }
+
+    // Continue loading remaining events one by one with intervals
+    for (let i = initialBurst; i < allEvents.length; i++) {
       if (signal?.aborted) return;
       try {
         // eslint-disable-next-line no-console
         console.debug('[mockEventService] loadEventsGradually:emit', { index: i, id: allEvents[i].id });
       } catch {}
       onEventLoaded(allEvents[i]);
-      // console.log('intervalMs', intervalMs);
-      // Wait before loading next event (except for the last one)
       if (i < allEvents.length - 1) {
-        // console.log('intervalMs', intervalMs);
         await wait(intervalMs, signal);
       }
     }
