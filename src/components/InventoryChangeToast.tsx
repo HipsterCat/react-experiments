@@ -87,7 +87,7 @@ const InventoryChangeToast = forwardRef<InventoryChangeToastRef>((_, ref) => {
     animate(flyingItemY, toastCenterY - screenCenterY, { duration: 0.5, ease: smoothEasing });
     animate(flyingItemScale, 1, { duration: 0.5, ease: smoothEasing });
     
-    // Fade out flying item and expand toast smoothly
+    // Fade out flying item and expand toast smoothly NO ITS TOO EARLY. IT SHOULD EXPAND A SLIGHT LAATER AND EXPANSION SHOULD START WHEN ICON IS HERE FOR SMOOTH MORPH!!!!! 
     setTimeout(() => {
       animate(flyingItemOpacity, 0, { duration: 0.25, ease: smoothEasing });
       setShowExpanded(true);
@@ -128,12 +128,13 @@ const InventoryChangeToast = forwardRef<InventoryChangeToastRef>((_, ref) => {
   const currentSize = showExpanded ? 'expanded' : 'circle';
   const isVisible = state === 'visible' || state === 'hiding';
   
-  // Filter only box items and prepare display
+  // Filter only box items and prepare display (cap visible to 3)
   const boxItems = data?.otherItems?.filter(item => 
     item.icon.includes('box_') || item.icon.includes('mystery_box')
   ) || [];
   const displayItems = boxItems.slice(0, 3);
-  const totalBoxCount = boxItems.length + 1; // +1 for main item if it's a box
+  // Prefer caller-provided totalCount to reflect the full amount, fallback to derived count
+  const totalBoxCount = (data?.totalCount ?? (boxItems.length + (data?.mainItem ? 1 : 0)));
   
   return (
     <div className="fixed left-1/2 -translate-x-1/2 top-20 z-[13000]">

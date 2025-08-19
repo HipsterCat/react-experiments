@@ -21,36 +21,36 @@ const BoxOpeningDemo: React.FC = () => {
   const handlePurchaseBox = async () => {
     // Prevent multiple rapid clicks
     if (isPurchasing) {
-      showToast({
-        message: 'Purchase already in progress!',
-        type: 'warning',
-        position: 'top',
-        duration: 2000
-      });
+      // showToast({
+      //   message: 'Purchase already in progress!',
+      //   type: 'warning',
+      //   position: 'top',
+      //   duration: 2000
+      // });
       return;
     }
 
     try {
       setIsPurchasing(true);
       
-      // Show purchasing toast
-      showToast({
-        message: 'Purchasing mystery box...',
-        type: 'info',
-        position: 'top',
-        duration: 2000
-      });
+      // // Show purchasing toast
+      // showToast({
+      //   message: 'Purchasing mystery box...',
+      //   type: 'info',
+      //   position: 'top',
+      //   duration: 2000
+      // });
       
       const purchaseResult: PurchaseBoxResponse = await purchaseBox();
       console.log('Box purchased:', purchaseResult);
       
-      // Show success toast
-      showToast({
-        message: 'Mystery box purchased successfully! 🎁',
-        type: 'success',
-        position: 'top',
-        duration: 3000
-      });
+      // // Show success toast
+      // showToast({
+      //   message: 'Mystery box purchased successfully! 🎁',
+      //   type: 'success',
+      //   position: 'top',
+      //   duration: 3000
+      // });
       
       // Deduct 150 from balance after successful purchase
       const buttonCoordinates = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
@@ -61,12 +61,12 @@ const BoxOpeningDemo: React.FC = () => {
       openBoxModal(purchaseResult.box_id, 'result');
     } catch (error) {
       console.error('Purchase failed:', error);
-      showToast({
-        message: 'Failed to purchase box. Please try again.',
-        type: 'error',
-        position: 'top',
-        duration: 4000
-      });
+      // showToast({
+      //   message: 'Failed to purchase box. Please try again.',
+      //   type: 'error',
+      //   position: 'top',
+      //   duration: 4000
+      // });
     } finally {
       setIsPurchasing(false);
     }
@@ -75,12 +75,12 @@ const BoxOpeningDemo: React.FC = () => {
   const handleOpenBox = async () => {
     // Prevent multiple rapid clicks
     if (isOpening || boxContents.isLoading) {
-      showToast({
-        message: 'Box opening already in progress!',
-        type: 'warning',
-        position: 'bottom',
-        duration: 2000
-      });
+      // showToast({
+      //   message: 'Box opening already in progress!',
+      //   type: 'warning',
+      //   position: 'bottom',
+      //   duration: 2000
+      // });
       return;
     }
 
@@ -88,12 +88,12 @@ const BoxOpeningDemo: React.FC = () => {
       setIsOpening(true);
       
       // Show loading toast
-      showToast({
-        message: 'Loading mystery box contents...',
-        type: 'info',
-        position: 'bottom',
-        duration: 2000
-      });
+      // showToast({
+      //   message: 'Loading mystery box contents...',
+      //   type: 'info',
+      //   position: 'bottom',
+      //   duration: 2000
+      // });
       
       const boxId = 1; // Demo box ID
       
@@ -101,23 +101,23 @@ const BoxOpeningDemo: React.FC = () => {
       await loadBoxContents(boxId);
       
       // Show ready toast
-      showToast({
-        message: 'Box loaded! Get ready to spin! 🎯',
-        type: 'success',
-        position: 'bottom',
-        duration: 2500
-      });
+      // showToast({
+      //   message: 'Box loaded! Get ready to spin! 🎯',
+      //   type: 'success',
+      //   position: 'bottom',
+      //   duration: 2500
+      // });
       
       // Then open the modal in wheel mode
       openBoxModal(boxId, 'wheel');
     } catch (error) {
       console.error('Failed to open box:', error);
-      showToast({
-        message: 'Failed to load box contents. Please try again.',
-        type: 'error',
-        position: 'bottom',
-        duration: 4000
-      });
+      // showToast({
+      //   message: 'Failed to load box contents. Please try again.',
+      //   type: 'error',
+      //   position: 'bottom',
+      //   duration: 4000
+      // });
     } finally {
       setIsOpening(false);
     }

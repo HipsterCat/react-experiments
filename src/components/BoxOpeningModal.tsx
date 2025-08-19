@@ -19,6 +19,11 @@ import starIcon from "../assets/boxes/star.webp";
 import { motion } from "framer-motion";
 import EventStack from "./EventStack";
 import { useEventStack } from "../hooks/useEventStack";
+import { useInventoryChangeToast } from './InventoryChangeToastProvider';
+import box_regular_icon from "../assets/boxes/rewards/box_regular.webp";
+import box_rare_icon from "../assets/boxes/rewards/box_rare.webp";
+import box_epic_icon from "../assets/boxes/rewards/box_epic.webp";
+import box_legend_icon from "../assets/boxes/rewards/box_legend.webp";
 
 
 
@@ -30,6 +35,7 @@ const BoxOpeningModal: React.FC = () => {
     useBoxOpening();
   const { showSnackbar } = useSnackbar();
   const { changeBalance } = useBalanceAnimation();
+  const inventoryToast = useInventoryChangeToast();
 
   const [showTopupConfetti, setShowTopupConfetti] = useState(false);
   const [wheelSpinState, setWheelSpinState] = useState<WheelSpinState>("IDLE");
@@ -225,11 +231,55 @@ const BoxOpeningModal: React.FC = () => {
     }
   };
 
+  const getBoxIconByValue = (value: number) => {
+    if (value === 12) return box_rare_icon;
+    if (value === 13) return box_epic_icon;
+    if (value === 14) return box_legend_icon;
+    return box_regular_icon;
+  };
+
+  const showInventoryToastIfNeeded = () => {
+    if (!(viewMode === 'result' && isBox && displayReward)) return;
+
+    const mainIcon = getBoxIconByValue(displayReward.reward_value);
+    const allBoxes = [
+      { id: 'regular', icon: box_regular_icon, name: 'Regular Box' },
+      { id: 'rare', icon: box_rare_icon, name: 'Rare Box' },
+      { id: 'epic', icon: box_epic_icon, name: 'Epic Box' },
+      { id: 'legend', icon: box_legend_icon, name: 'Legendary Box' },
+    ];
+    const mainItem = { id: `main-${Date.now()}` , icon: mainIcon, name: 'Box' };
+    // Randomly choose between 3-6 items for total count, but cap visible trailing items to 3
+    const selectedOtherItems = allBoxes
+      .filter(i => i.icon !== mainIcon)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, Math.floor(Math.random() * 4) + 3); // 3-6 items
+    const visibleOtherItems = selectedOtherItems.slice(0, 3);
+
+    inventoryToast.show({
+      mainItem,
+      otherItems: visibleOtherItems,
+      totalCount: selectedOtherItems.length + 1,
+      fromCoordinates: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+      fromSize: { width: 180, height: 180 },
+      onClick: () => {
+        console.log('Open inventory requested from toast');
+      },
+    });
+  };
+
   const handleSaveToInventory = () => {
     console.log('handleSaveToInventory closeBoxModal');
+    showInventoryToastIfNeeded();
     closeBoxModal();
     dispatch(fetchTasks());
     dispatch(fetchProfile());
+  };
+
+  const handleModalClose = () => {
+    // Trigger toast when closing the modal on the result screen if it's a Box reward
+    showInventoryToastIfNeeded();
+    closeBoxModal();
   };
 
 
@@ -294,7 +344,7 @@ const BoxOpeningModal: React.FC = () => {
   return (
         <AnimatedFullscreen
       isOpen={isBoxOpeningModalOpen}
-      onClose={closeBoxModal}
+      onClose={handleModalClose}
       backgroundImage={getBg().backgroundImage}
       animationType="scale"
       closeButtonColor="#000"

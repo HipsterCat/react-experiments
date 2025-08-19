@@ -53,7 +53,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [animatingCoins, setAnimatingCoins] = useState<Coin[]>([]);
-  const [balanceVisible, setBalanceVisible] = useState<boolean>(true);
+  const [balanceVisible, setBalanceVisible] = useState<boolean>(alwaysVisible);
   const HOLD_AFTER_MS = 0; // pause on finished number
   const motionValue = useMotionValue(balance);
   const [displayBalance, setDisplayBalance] = useState<number>(balance);
@@ -80,7 +80,10 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
 
   // Cleanup timers and animations on unmount
   useEffect(() => {
+    console.log('[BalanceAnimation] mounted with props', { initialCoinsBalance, initialUsdtBalance, alwaysVisible, animationSpeed, initialBalanceType });
+    console.log('[BalanceAnimation] initial state', { coinsBalance, usdtBalance, balanceType, balanceVisible, displayBalance: balance, targetRef: targetRef.current });
     return () => {
+      console.log('[BalanceAnimation] unmounted');
       animationControlsRef.current?.stop();
       if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
@@ -90,6 +93,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
 
   // Update balance visibility when toggle changes
   useEffect(() => {
+    console.log('[BalanceAnimation] alwaysVisible changed →', alwaysVisible);
     setBalanceVisible(alwaysVisible);
   }, [alwaysVisible]);
 
@@ -134,6 +138,10 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   };
 
   const changeBalance = (amount: number, fromCoordinates: { x: number; y: number }) => {
+    console.log('[BalanceAnimation.changeBalance] called', { amount, fromCoordinates, balanceType, balanceVisible, displayBalance, targetRef: targetRef.current });
+    // Store the original visibility state before making changes
+    const wasHidden = !balanceVisible;
+    
     // Always ensure visibility during activity
     if (!balanceVisible) {
       setBalanceVisible(true);
@@ -157,6 +165,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
     const currentDisplay = Math.round(motionValue.get());
     const newTarget = Math.max(0, (isAnimating ? targetRef.current : balance) + amount);
     targetRef.current = newTarget;
+    console.log('[BalanceAnimation.changeBalance] computed', { currentDisplay, newTarget, isAnimatingBefore: isAnimating, wasHidden });
 
     // Record the sign of this change so highlight color is correct immediately
     deltaSignRef.current = amount > 0 ? 1 : amount < 0 ? -1 : 0;
@@ -173,17 +182,20 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
     // Spawn additional coins for this delta
     spawnCoins(amount, fromCoordinates);
 
-    // If we were in animation-only mode and hidden, make it visible first then retarget shortly after
-    if (!alwaysVisible && !balanceVisible) {
+    // If we were in animation-only mode and was hidden, give a small delay for visibility animation
+    if (!alwaysVisible && wasHidden) {
       setTimeout(() => {
+        console.log('[BalanceAnimation.changeBalance] delayed retarget after becoming visible');
         retargetCounterAnimation(newTarget);
       }, 50 * animationSpeed);
     } else {
+      console.log('[BalanceAnimation.changeBalance] immediate retarget');
       retargetCounterAnimation(newTarget);
     }
   };
 
   const spawnCoins = (amount: number, fromCoordinates: { x: number; y: number }) => {
+    console.log('[BalanceAnimation.spawnCoins] amount/from', { amount, fromCoordinates });
     const from = amount > 0 ? fromCoordinates : { x: MAX_X_OFFSET, y: MAX_Y_OFFSET };
     const toCenter = amount > 0 ? { x: MAX_X_OFFSET, y: MAX_Y_OFFSET } : fromCoordinates;
     const to = { x: toCenter.x - 8, y: toCenter.y - 7 };
@@ -216,11 +228,13 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
     if (coinFinishTimerRef.current) clearTimeout(coinFinishTimerRef.current);
     coinFinishTimerRef.current = window.setTimeout(() => {
       if (thisCoinsRunId !== coinsRunIdRef.current) return;
+      console.log('[BalanceAnimation.spawnCoins] coin flight finished; hiding in 3s?', { alwaysVisible });
       setIsAnimating(false);
       setDiffStartIndex(-1);
       setAnimatingCoins([]);
       if (!alwaysVisible) {
         hideTimerRef.current = window.setTimeout(() => {
+          console.log('[BalanceAnimation.spawnCoins] hiding balance');
           setBalanceVisible(false);
         }, 3000);
       }
@@ -228,6 +242,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
   };
 
   const retargetCounterAnimation = (newTarget: number) => {
+    console.log('[BalanceAnimation.retargetCounterAnimation] start', { from: motionValue.get(), to: newTarget });
     // Stop any in-flight tween and start a new one from the current value
     animationControlsRef.current?.stop();
     const localRunId = ++animationRunIdRef.current;
@@ -240,6 +255,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
       duration: countingAnimationDuration * animationSpeed,
       ease: "easeOut",
       onUpdate: (val) => {
+        // Verbose but useful once
         setDisplayBalance(val);
       },
       onComplete: () => {
@@ -252,6 +268,7 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
           setUsdtBalance(newTarget);
         }
         setDisplayBalance(newTarget);
+        console.log('[BalanceAnimation.retargetCounterAnimation] complete', { newTarget, balanceType });
         // finalization handled by coinFinishTimerRef scheduled in spawnCoins
       }
     });
@@ -262,12 +279,14 @@ const BalanceAnimation = forwardRef<BalanceAnimationRef, BalanceAnimationProps>(
     changeBalance,
     getBalanceIconCoordinates,
     setBalanceType: (type: 'coins' | 'usdt') => {
+      console.log('[BalanceAnimation.setBalanceType] switching', { from: balanceType, to: type, coinsBalance, usdtBalance });
       setBalanceType(type);
       // Switch to the persistent balance for this type
       const newBalance = type === 'coins' ? coinsBalance : usdtBalance;
       setDisplayBalance(newBalance);
       motionValue.set(newBalance);
       targetRef.current = newBalance;
+      console.log('[BalanceAnimation.setBalanceType] applied', { newBalance, targetRef: targetRef.current });
     }
   }));
 

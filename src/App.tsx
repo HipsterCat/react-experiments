@@ -9,6 +9,7 @@ import { BalanceAnimationProvider, useBalanceAnimation } from './hooks/useBalanc
 import { NiceToastProvider } from './components/NiceToastProvider'
 import EventStackDemo from './components/EventStackDemo'
 import { NavigationProvider, Page, useNavigation } from './StateRouter'
+import { InventoryChangeToastProvider } from './components/InventoryChangeToastProvider'
 import { Tabbar } from './components/Tabbar/Tabbar'
 import { TabbarItem } from './components/Tabbar/TabbarItem'
 
@@ -17,6 +18,7 @@ function App() {
     <AppRoot>
       <NiceToastProvider>
         <BalanceAnimationProvider>
+          <InventoryChangeToastProvider>
           <BoxOpeningProvider>
             <NavigationProvider defaultPage="leaderboard">
               <MainContent />
@@ -28,6 +30,7 @@ function App() {
             {/* Balance Animation - positioned above all modals */}
             <BalanceAnimationLayer />
           </BoxOpeningProvider>
+          </InventoryChangeToastProvider>
         </BalanceAnimationProvider>
       </NiceToastProvider>
     </AppRoot>
@@ -37,7 +40,7 @@ function App() {
 function MainContent() {
   const { currentPage, navigate } = useNavigation();
   
-  const pages = ['leaderboard', 'balance', 'toasts', 'rewards', 'events'];
+  const pages = ['leaderboard', 'toasts', 'rewards', 'events'];
   const currentIndex = pages.indexOf(currentPage);
   
   const goToPrevious = () => {
@@ -73,13 +76,7 @@ function MainContent() {
         <LeaderboardOvertakeDemo />
       </Page>
       
-      <Page name="balance">
-        <div className="p-4">
-          <h2 className="text-xl font-bold mb-4">Balance Demo</h2>
-          <BalanceAnimationLayer />
-        </div>
-      </Page>
-      
+
       <Page name="toasts">
         <InventoryChangeToastDemo />
       </Page>
