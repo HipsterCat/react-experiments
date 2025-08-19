@@ -2,7 +2,7 @@ import type { InventoryReward } from "../types/rewards";
 import { RewardTypeImage } from "./RewardTypeImage";
 import useEmblaCarousel from "embla-carousel-react";
 import type { Dispatch } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 export type WheelSpinState = "IDLE" | "SPINNING" | "STOPPED";
@@ -35,7 +35,7 @@ export const PrizeCarousel = ({
   // in result mode before the real prizes are loaded.
   const items = prizes.length > 0 ? prizes : (actualReward ? [actualReward] : []);
 
-  const [emblaRef, emblaApi] = useEmblaCarousel({
+  const emblaOptions = useMemo(() => ({
     axis: "y",
     loop: true,
     dragFree: true,
@@ -44,7 +44,9 @@ export const PrizeCarousel = ({
     watchDrag: false,
     skipSnaps: false,
     containScroll: false,
-  });
+  }), []);
+
+  const [emblaRef, emblaApi] = useEmblaCarousel(emblaOptions);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   // const prevItemsLengthRef = useRef<number>(items.length);
@@ -52,6 +54,9 @@ export const PrizeCarousel = ({
   const intervalRef = useRef<number>();
   const animationRef = useRef<number>();
   const animateFnRef = useRef<(() => void) | null>(null);
+  const idleTickRef = useRef<number>(0);
+  const prizesRef = useRef<InventoryReward[]>(prizes);
+  const onFinalRewardRef = useRef<typeof onFinalReward>(onFinalReward);
 
   const spinStartTimeRef = useRef<number>();
   const lastScrollTimeRef = useRef<number>();
@@ -59,6 +64,14 @@ export const PrizeCarousel = ({
   const spinDurationRef = useRef<number>(0);
   const pausedSinceRef = useRef<number | null>(null);
   const totalPausedMsRef = useRef<number>(0);
+
+  // Mount/unmount diagnostics
+  useEffect(() => {
+    console.log('[PrizeCarousel] mount', { itemsLength: items.length, wheelSpinState });
+    return () => {
+      console.log('[PrizeCarousel] unmount');
+    };
+  }, []);
 
   // Debug logging - commented out for performance
   // useEffect(() => {
@@ -75,6 +88,40 @@ export const PrizeCarousel = ({
   useEffect(() => {
     if (!showRevealAnimation) setSelectedLoaded(false);
   }, [showRevealAnimation]);
+
+  // Embla readiness diagnostics
+  useEffect(() => {
+    if (!emblaApi) {
+      console.log('[PrizeCarousel] emblaApi not ready yet');
+      return;
+    }
+    const diag = {
+      snaps: emblaApi.scrollSnapList().length,
+      selected: emblaApi.selectedScrollSnap(),
+      canPrev: emblaApi.canScrollPrev(),
+      canNext: emblaApi.canScrollNext(),
+    };
+    console.log('[PrizeCarousel] emblaApi ready', diag);
+  }, [emblaApi]);
+
+  // Props diagnostics
+  useEffect(() => {
+    console.log('[PrizeCarousel] props updated', {
+      wheelSpinState,
+      prizesLength: prizes.length,
+      itemsLength: items.length,
+      showRevealAnimation,
+      hasActualReward: Boolean(actualReward),
+    });
+  }, [wheelSpinState, prizes, items.length, showRevealAnimation, actualReward]);
+
+  // Keep latest callback/data in refs to avoid re-running effects
+  useEffect(() => {
+    prizesRef.current = prizes;
+  }, [prizes]);
+  useEffect(() => {
+    onFinalRewardRef.current = onFinalReward;
+  }, [onFinalReward]);
 
   useEffect(() => {
     if (!showRevealAnimation || !onRevealComplete) return;
@@ -100,169 +147,171 @@ export const PrizeCarousel = ({
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
-    setSelectedIndex(emblaApi.selectedScrollSnap());
+    const index = emblaApi.selectedScrollSnap();
+    setSelectedIndex(index);
+    // Lightweight log to trace selection changes
+    console.log('[PrizeCarousel] onSelect ->', index);
   }, [emblaApi]);
 
   useEffect(() => {
     if (!emblaApi) return;
     onSelect();
     emblaApi.on("select", onSelect);
+    console.log('[PrizeCarousel] emblaApi select listener attached');
     return () => {
       emblaApi.off("select", onSelect);
+      console.log('[PrizeCarousel] emblaApi select listener detached');
     };
   }, [emblaApi, onSelect]);
 
   // Removed forced re-centering to avoid index jumps after reveal
 
-  useEffect(() => {
-    const clear = () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-
-    if (!emblaApi) return clear;
-
-    if (wheelSpinState === "IDLE") {
-      intervalRef.current = window.setInterval(() => {
+  const idleActiveRef = useRef(false);
+  const startIdle = useCallback(() => {
+    if (!emblaApi || idleActiveRef.current) return;
+    idleActiveRef.current = true;
+    idleTickRef.current = 0;
+    console.log('[PrizeCarousel] IDLE -> start auto-scroll', {
+      intervalMs: 2000,
+      itemsLength: items.length,
+      selected: emblaApi.selectedScrollSnap(),
+    });
+    intervalRef.current = window.setInterval(() => {
+      const before = emblaApi.selectedScrollSnap();
+      idleTickRef.current += 1;
+      try {
         emblaApi.scrollPrev();
-      }, 2000);
+      } catch (e) {
+        console.warn('[PrizeCarousel] IDLE tick scrollPrev error', e);
+      }
+      const after = emblaApi.selectedScrollSnap();
+      if (idleTickRef.current % 3 === 1) {
+        console.log('[PrizeCarousel] IDLE tick', {
+          tick: idleTickRef.current,
+          before,
+          after,
+          itemsLength: items.length,
+        });
+      }
+    }, 2000);
+  }, [emblaApi, items.length]);
 
-      return clear;
+  // Start/stop idle scroller based on state without tearing on re-renders
+  useEffect(() => {
+    if (!emblaApi) return;
+    if (wheelSpinState === 'IDLE') {
+      if (!idleActiveRef.current && !intervalRef.current) startIdle();
+    } else {
+      if (idleActiveRef.current && intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = undefined as unknown as number;
+        idleActiveRef.current = false;
+        console.log('[PrizeCarousel] IDLE -> stop auto-scroll');
+      }
     }
+  }, [emblaApi, wheelSpinState, startIdle]);
 
-    if (wheelSpinState === "SPINNING") {
-      clear();
-      hasSpunRef.current = true;
+  // Handle spinning in a separate effect
+  const spinningActiveRef = useRef(false);
+  useEffect(() => {
+    if (!emblaApi) return;
+    if (wheelSpinState !== 'SPINNING') return;
+    // Stop idle if running
+    if (idleActiveRef.current && intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = undefined as unknown as number;
+      idleActiveRef.current = false;
+      console.log('[PrizeCarousel] stop idle before SPINNING');
+    }
+    if (spinningActiveRef.current) return;
+    spinningActiveRef.current = true;
 
-      console.log("=== SPIN START ===");
-      console.log("Current Index:", emblaApi.selectedScrollSnap());
+    hasSpunRef.current = true;
+    console.log("=== SPIN START ===", {
+      selected: emblaApi.selectedScrollSnap(),
+      itemsLength: items.length,
+    });
 
-      spinStartTimeRef.current = Date.now();
-      totalPausedMsRef.current = 0;
-      pausedSinceRef.current = null;
-      lastScrollTimeRef.current = Date.now() - 100; // Start with a gap so first scroll happens immediately
+    spinStartTimeRef.current = Date.now();
+    totalPausedMsRef.current = 0;
+    pausedSinceRef.current = null;
+    lastScrollTimeRef.current = Date.now() - 100;
 
-      const spinDuration = 4000 + Math.random() * 1000; // 4-5 seconds
-      spinDurationRef.current = spinDuration;
+    const spinDuration = 4000 + Math.random() * 1000;
+    spinDurationRef.current = spinDuration;
 
-      let scrollCount = 0;
-      let lastLogTime = Date.now();
+    let scrollCount = 0;
+    let lastLogTime = Date.now();
 
-      const animate = () => {
-        const now = Date.now();
-        const totalElapsed = now - (spinStartTimeRef.current || 0) - (totalPausedMsRef.current || 0);
-        const timeSinceLastScroll = now - (lastScrollTimeRef.current || 0);
+    const animate = () => {
+      const now = Date.now();
+      const totalElapsed = now - (spinStartTimeRef.current || 0) - (totalPausedMsRef.current || 0);
+      const timeSinceLastScroll = now - (lastScrollTimeRef.current || 0);
+      const progress = Math.min(totalElapsed / spinDuration, 1);
+      const easedProgress = progress * progress;
+      const minDelay = 10;
+      const maxDelay = 400;
+      const currentDelay = minDelay + (maxDelay - minDelay) * easedProgress;
 
-        // Calculate progress with smooth easing
-        const progress = Math.min(totalElapsed / spinDuration, 1);
-        
-        // Use much gentler quadratic easing for gradual slowdown
-        const easedProgress = progress * progress;
-        
-        // Calculate current delay based on eased progress
-        // Start with minDelay (fast), end with maxDelay (slow)
-        const minDelay = 10;
-        const maxDelay = 400; // Reduced max delay
-        const currentDelay = minDelay + (maxDelay - minDelay) * easedProgress;
+      if (now - lastLogTime > 500) {
+        console.log(`[SPIN DEBUG] Elapsed: ${totalElapsed}ms/${spinDuration}ms, Progress: ${(progress * 100).toFixed(1)}%, EasedProgress: ${(easedProgress * 100).toFixed(1)}%, CurrentDelay: ${currentDelay.toFixed(1)}ms, ScrollCount: ${scrollCount}, CurrentIndex: ${emblaApi.selectedScrollSnap()}, PrizeLength: ${items.length}`);
+        lastLogTime = now;
+      }
 
-        // Debug logging every 500ms
-        if (now - lastLogTime > 500) {
-          console.log(`[SPIN DEBUG] Elapsed: ${totalElapsed}ms/${spinDuration}ms, Progress: ${(progress * 100).toFixed(1)}%, EasedProgress: ${(easedProgress * 100).toFixed(1)}%, CurrentDelay: ${currentDelay.toFixed(1)}ms, ScrollCount: ${scrollCount}, CurrentIndex: ${emblaApi.selectedScrollSnap()}, PrizeLength: ${items.length}`);
-          lastLogTime = now;
+      if (timeSinceLastScroll >= currentDelay) {
+        const beforeIndex = emblaApi.selectedScrollSnap();
+        emblaApi.scrollPrev();
+        scrollCount++;
+        lastScrollTimeRef.current = now;
+        const afterIndex = emblaApi.selectedScrollSnap();
+        if (scrollCount % 10 === 0 || currentDelay > 200) {
+          console.log(`[SCROLL] #${scrollCount}: ${beforeIndex} -> ${afterIndex}, Delay: ${currentDelay.toFixed(1)}ms, TimeSinceLastScroll: ${timeSinceLastScroll.toFixed(1)}ms`);
+        }
+      }
+
+      const minScrolls = 35;
+      if (totalElapsed < spinDuration || scrollCount < minScrolls) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
         }
 
-        if (timeSinceLastScroll >= currentDelay) {
-          const beforeIndex = emblaApi.selectedScrollSnap();
-          emblaApi.scrollPrev();
-          scrollCount++;
-          lastScrollTimeRef.current = now;
-          
-          const afterIndex = emblaApi.selectedScrollSnap();
-          
-          // Log every scroll for detailed tracking
-          if (scrollCount % 10 === 0 || currentDelay > 200) {
-            console.log(`[SCROLL] #${scrollCount}: ${beforeIndex} -> ${afterIndex}, Delay: ${currentDelay.toFixed(1)}ms, TimeSinceLastScroll: ${timeSinceLastScroll.toFixed(1)}ms`);
-          }
-        }
-
-        // Continue until time is up AND we have minimum scrolls
-        const minScrolls = 35;
-        if (totalElapsed < spinDuration || scrollCount < minScrolls) {
-          animationRef.current = requestAnimationFrame(animate);
-        } else {
-          // Stop at current position
-          if (animationRef.current) {
-            cancelAnimationFrame(animationRef.current);
-          }
-
-          const finalIndex = emblaApi.selectedScrollSnap();
-          console.log(`[SPIN END] Total scrolls: ${scrollCount}, Final index: ${finalIndex}, Total rotations: ${(scrollCount / prizes.length).toFixed(2)}`);
-          console.log("Prize at index:", prizes[finalIndex]);
-          // Report final reward to parent BEFORE stopping so it can react immediately
-          window.setTimeout(() => {
-          if (onFinalReward) {
+        const finalIndex = emblaApi.selectedScrollSnap();
+        const prizesSnapshot = prizesRef.current;
+        console.log(`[SPIN END] Total scrolls: ${scrollCount}, Final index: ${finalIndex}, Total rotations: ${(scrollCount / prizesSnapshot.length).toFixed(2)}`);
+        console.log("Prize at index:", prizesSnapshot[finalIndex]);
+        window.setTimeout(() => {
+          if (onFinalRewardRef.current) {
             try {
-              onFinalReward(prizes[finalIndex]);
+              onFinalRewardRef.current(prizesSnapshot[finalIndex]);
               setSelectedIndex(finalIndex);
-              console.log("onFinalReward", prizes[finalIndex], "finalIndex", finalIndex);
-
+              console.log("onFinalReward", prizesSnapshot[finalIndex], "finalIndex", finalIndex);
             } catch (e) {
               console.warn("onFinalReward callback failed:", e);
             }
           }
-            setSpinState("STOPPED");
-          }, 500);
-        }
-      };
-
-      animateFnRef.current = animate;
-      animationRef.current = requestAnimationFrame(animate);
-    }
-
-    return clear;
-  }, [emblaApi, wheelSpinState, setSpinState, prizes, onFinalReward, items.length]);
-
-  // Pause/resume scrolling and spinning based on page visibility
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!emblaApi) return;
-      if (document.hidden) {
-        // Pause any ongoing animations/intervals
-        if (animationRef.current) cancelAnimationFrame(animationRef.current);
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        if (wheelSpinState === 'SPINNING') {
-          pausedSinceRef.current = Date.now();
-        }
-      } else {
-        // Resume depending on state
-        if (wheelSpinState === 'SPINNING') {
-          if (pausedSinceRef.current) {
-            totalPausedMsRef.current += Date.now() - pausedSinceRef.current;
-            pausedSinceRef.current = null;
-          }
-          if (animateFnRef.current) {
-            animationRef.current = requestAnimationFrame(animateFnRef.current);
-          }
-        } else if (wheelSpinState === 'IDLE') {
-          // Restart idle gentle scroll
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          intervalRef.current = window.setInterval(() => {
-            emblaApi.scrollPrev();
-          }, 2000);
-        }
+          setSpinState("STOPPED");
+          spinningActiveRef.current = false;
+        }, 500);
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    animateFnRef.current = animate;
+    animationRef.current = requestAnimationFrame(animate);
+  }, [emblaApi, wheelSpinState, setSpinState, items.length]);
+
+  // Unmount cleanup
+  useEffect(() => {
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      idleActiveRef.current = false;
+      spinningActiveRef.current = false;
+      console.log('[PrizeCarousel] cleanup on unmount');
     };
-  }, [emblaApi, wheelSpinState]);
+  }, []);
+ 
 
   return (
     <div className="embla absolute inset-0 flex items-center justify-center overflow-hidden">

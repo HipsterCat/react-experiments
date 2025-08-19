@@ -108,12 +108,14 @@ const BoxOpeningModal: React.FC = () => {
 
   const isBox = displayReward ? displayReward.reward_type === "box" : false;
 
-  // EventStack for showing recent activity (always mounted, internally animated visibility)
-  // Only show events when in wheel mode and ready to spin, not in result mode
-  const canOpenOrReveal = viewMode === 'wheel' && wheelSpinState === 'IDLE';
-  const showContinue = (viewMode === 'result' && !isBox); // continue button screen
-  // Only load events when modal is actually open and in the right state
-  const { events } = useEventStack(isBoxOpeningModalOpen && canOpenOrReveal);
+  // EventStack for showing recent activity (always mounted)
+  // Visible when: wheel is idle OR result screen shows a Box (hide on spinning and on non-box result)
+  const shouldShowEvents = (
+    (viewMode === 'wheel' && wheelSpinState === 'IDLE') ||
+    (viewMode === 'result' && isBox)
+  );
+  // Only load events when modal is open and events should be visible
+  const { events } = useEventStack(isBoxOpeningModalOpen && shouldShowEvents);
 
   useEffect(() => {
     // Do not react if modal is closed
@@ -220,6 +222,9 @@ const BoxOpeningModal: React.FC = () => {
       if (isBox) {
         setShowRevealAnimation(true);
         await new Promise(resolve => setTimeout(resolve, 800));
+        // Proactively switch to wheel after reveal delay to avoid missing callbacks
+        setHasSpun(false);
+        switchView('wheel');
       }
 
       // Do not switch view yet; wait for onRevealComplete to switch to wheel
@@ -285,19 +290,34 @@ const BoxOpeningModal: React.FC = () => {
 
 
   
-  // Debug logging
+  // Debug logging (avoid object identity churn)
   useEffect(() => {
+    const rewardType = displayReward?.reward_type ?? null;
+    const rewardValue = displayReward?.reward_value ?? null;
     console.log('[BoxOpeningModal] State:', {
       viewMode,
       hasSpun,
-      displayReward,
-      actualReward,
+      rewardType,
+      rewardValue,
+      actualRewardType: actualReward?.reward_type ?? null,
+      actualRewardValue: actualReward?.reward_value ?? null,
       isBox,
       showRevealAnimation,
       wheelSpinState,
       currentBoxId
     });
-  }, [viewMode, hasSpun, displayReward, actualReward, isBox, showRevealAnimation, wheelSpinState, currentBoxId]);
+  }, [
+    viewMode,
+    hasSpun,
+    actualReward?.reward_type,
+    actualReward?.reward_value,
+    isBox,
+    showRevealAnimation,
+    wheelSpinState,
+    currentBoxId,
+    displayReward?.reward_type,
+    displayReward?.reward_value,
+  ]);
 
   const getBg = () => {
     if (
@@ -454,11 +474,11 @@ const BoxOpeningModal: React.FC = () => {
           </>
       </div>
       {/* EventStack - anchored top-left (adaptive width inside) */}
-      <div className="absolute top-20 left-2">
+      <div className="absolute top-20 left-2 z-[11001]">
         <EventStack
           events={events}
           maxVisibleItems={4}
-          visible={!showContinue && canOpenOrReveal}
+          visible={shouldShowEvents}
           title={'Recent Activity'}
           width={130}
           itemHeight={40}

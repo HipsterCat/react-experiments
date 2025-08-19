@@ -13,24 +13,9 @@ const BalanceAnimationContext = createContext<BalanceAnimationContextType | unde
 export const BalanceAnimationProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const balanceRef = useRef<BalanceAnimationRef>(null);
 
-  // Debug: provider lifecycle
-  useEffect(() => {
-    console.log('[BalanceProvider] mounted');
-    return () => {
-      console.log('[BalanceProvider] unmounted');
-    };
-  }, []);
-
   const changeBalance = (amount: number, fromCoordinates: { x: number; y: number }, balanceType?: 'coins' | 'usdt') => {
     const hasRef = !!balanceRef.current;
     const hasMethods = hasRef && typeof balanceRef.current?.changeBalance === 'function' && typeof balanceRef.current?.setBalanceType === 'function';
-    console.log('[BalanceProvider.changeBalance] called', {
-      amount,
-      fromCoordinates,
-      balanceType: balanceType ?? '(unchanged)',
-      hasRef,
-      hasMethods,
-    });
     if (!hasRef) {
       console.warn('[BalanceProvider.changeBalance] balanceRef.current is null');
       return;
@@ -38,11 +23,9 @@ export const BalanceAnimationProvider: FC<{ children: ReactNode }> = ({ children
     try {
       // Switch to the specified balance type if provided
       if (balanceType) {
-        console.log('[BalanceProvider.changeBalance] setBalanceType →', balanceType);
         balanceRef.current.setBalanceType(balanceType);
       }
       // Then change the balance
-      console.log('[BalanceProvider.changeBalance] delegating to BalanceAnimation.changeBalance');
       balanceRef.current.changeBalance(amount, fromCoordinates);
     } catch (error) {
       console.error('[BalanceProvider.changeBalance] error:', error);
@@ -53,7 +36,6 @@ export const BalanceAnimationProvider: FC<{ children: ReactNode }> = ({ children
     const hasRef = !!balanceRef.current;
     if (hasRef) {
       const coords = balanceRef.current.getBalanceIconCoordinates();
-      console.log('[BalanceProvider.getBalanceIconCoordinates] →', coords);
       return coords;
     }
     console.warn('[BalanceProvider.getBalanceIconCoordinates] balanceRef.current is null');
@@ -62,7 +44,6 @@ export const BalanceAnimationProvider: FC<{ children: ReactNode }> = ({ children
 
   const setBalanceType = (type: 'coins' | 'usdt') => {
     const hasRef = !!balanceRef.current;
-    console.log('[BalanceProvider.setBalanceType] called →', type, { hasRef });
     if (!hasRef) return;
     try {
       balanceRef.current.setBalanceType(type);
@@ -87,7 +68,6 @@ export const BalanceAnimationProvider: FC<{ children: ReactNode }> = ({ children
 
 export const useBalanceAnimation = () => {
   const context = useContext(BalanceAnimationContext);
-  console.log('[useBalanceAnimation] hook accessed. Context is', context ? 'present' : 'undefined');
   if (context === undefined) {
     throw new Error('useBalanceAnimation must be used within a BalanceAnimationProvider');
   }
